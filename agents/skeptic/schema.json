@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdicts"],
+  "properties": {
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_ids", "keep", "drop_case_ids", "reasons_with_citations"],
+        "properties": {
+          "case_ids": {"type": "array", "items": {"type": "string"}},
+          "keep": {"type": "boolean"},
+          "drop_case_ids": {"type": "array", "items": {"type": "string"}},
+          "reasons_with_citations": {"type": "string"}
+        }
+      }
+    }
+  }
+}

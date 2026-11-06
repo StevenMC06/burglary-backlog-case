@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["series", "hypotheses"],
+  "properties": {
+    "series": {
+      "type": "array",
+      "items": {"type": "array", "items": {"type": "string"}, "minItems": 2}
+    },
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_ids", "rationale_with_citations"],
+        "properties": {
+          "case_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+          "rationale_with_citations": {"type": "string"}
+        }
+      }
+    }
+  }
+}

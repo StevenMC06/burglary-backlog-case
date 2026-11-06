@@ -1,0 +1,5 @@
+{
+  "model": "sonnet",
+  "allowed_tools": ["get_case", "pawn_lookup", "verify_series", "check_citations"],
+  "input": "case_id"
+}

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mo", "items", "notes"],
+  "properties": {
+    "mo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["premise", "entry_point", "entry_method", "time_band", "weekday", "property_types", "signatures"],
+      "properties": {
+        "premise": {"type": "string", "enum": ["residential", "commercial", "garage", "storage"]},
+        "entry_point": {"type": "string", "enum": ["front_door", "rear_door", "sliding_door", "window", "garage_door", "other", "unknown"]},
+        "entry_method": {"type": "string", "enum": ["pry", "smash", "kick", "unlocked", "cut_screen", "key_or_code", "unknown"]},
+        "time_band": {"type": "string", "enum": ["night", "morning", "midday", "evening", "late", "unknown"]},
+        "weekday": {"type": "boolean"},
+        "property_types": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["laptop", "phone", "tablet", "camera", "game_console", "jewelry", "cash", "firearm", "tools", "bicycle", "electronics", "other"]}
+        },
+        "signatures": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "items": {"type": "array", "items": {"type": "string"}},
+    "notes": {"type": "string"}
+  }
+}
