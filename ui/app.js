@@ -39,11 +39,35 @@ async function api(path, opts) {
 const fmtTime = (s) => (s == null ? "" : new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") + "Z");
 const pct = (x) => (x * 100).toFixed(1) + "%";
 const shortId = (id) => id.replace(/^CC-/, "");
-const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX");
+const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX")
+  .replace(/\b(Nw|Ne|Sw|Se|Slu|Id)\b/g, (w) => w.toUpperCase());
+// ---------------------------------------------------------------- motion
+// Web Animations API directly (what motion.dev wraps), so no library or CDN. Short and interruptible;
+// skipped for prefers-reduced-motion and where element.animate is missing (tests, old browsers).
+const EASE = "cubic-bezier(.22,.9,.24,1)";
+const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function anim(el, frames, opts) {
+  if (!el || typeof el.animate !== "function" || calm()) return null;
+  return el.animate(frames, { duration: 220, easing: EASE, fill: "backwards", ...opts });
+}
+function rise(el, delay = 0, dy = 6) { return anim(el, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "none" }], { delay }); }
+function stagger(els, step = 30, max = 8) { [...els].slice(0, max).forEach((el, i) => rise(el, i * step)); }
+function countUp(el, to, ms = 520) {
+  if (!el || calm() || typeof requestAnimationFrame !== "function") return;
+  const t0 = performance.now();
+  const tick = (t) => { const k = Math.min(1, (t - t0) / ms); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+function growBars(root) {
+  root?.querySelectorAll?.(".meter i, .bar i").forEach((i, n) =>
+    anim(i, [{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 480, delay: 60 + n * 18 }));
+}
+
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
   t.hidden = false;
+  anim(t, [{ opacity: 0, transform: "translate(-50%, 10px) scale(.98)" }, { opacity: 1, transform: "translate(-50%, 0) scale(1)" }], { duration: 240 });
   clearTimeout(toast.t);
   toast.t = setTimeout(() => (t.hidden = true), 2600);
 }
@@ -84,13 +108,15 @@ function renderQueue() {
   const ul = $("queue-list");
   ul.replaceChildren(
     ...cases.map((c) => {
+      const sv = c.solvability;
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
-        h("span", { class: "l1" }, c.id),
+        h("span", { class: "l1" }, h("span", { class: "qid" }, c.id),
+          sv ? h("span", { class: "qscore", title: `Solvability ${sv.score.toFixed(0)}/100 · ${sv.band}` }, sv.score.toFixed(0)) : null),
         h("span", { class: "l2" }, human(c.block)),
         h("span", { class: "l3" }, human(c.neighborhood)),
         (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
-          c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
-          c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
+          c.flags.pawn_hit === "exact_serial_lead" ? h("span", { class: "flag lead" }, "Serial lead") : null,
+          c.flags.series_id ? h("span", { class: "flag series" }, "Possible series") : null) : null);
       return h("li", {}, btn);
     })
   );
@@ -138,10 +164,26 @@ function pawnCard(p) {
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
+  const lead = d.pawn.find((p) => p.match.status === "exact_serial_lead");
+  const winH = c.window_end != null && c.window_start != null ? (c.window_end - c.window_start) / 3600 : null;
   fill($("case-heading"),
-    h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
-    h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
-    h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`));
+    h("div", { class: "heading-main" },
+      h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
+      h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
+      h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
+    h("dl", { class: "summary" },
+      h("div", { class: "sum score" },
+        h("dt", {}, "Solvability"),
+        h("dd", {}, h("b", {}, s.score.toFixed(0)), h("span", { class: "of" }, "/100"))),
+      h("div", { class: "sum" },
+        h("dt", {}, "Property"),
+        h("dd", {}, lead ? h("span", { class: "mono" }, lead.match.pawn_id) : "No serial lead")),
+      d.series_id ? h("div", { class: "sum" },
+        h("dt", {}, "Series"),
+        h("dd", {}, d.series_id)) : null,
+      winH != null ? h("div", { class: "sum" },
+        h("dt", {}, "Offense window"),
+        h("dd", {}, `${winH.toFixed(0)} h`)) : null));
   fill(box, 
     h("section", { class: "case-section" }, h("h2", {}, "Report"),
       h("p", { class: "narr" }, c.narrative),
@@ -214,20 +256,26 @@ function stepItem(st, i, d) {
       accept.disabled = reject.disabled = true;
       try {
         await decide("accept_step", d.case.id, { step: st.step, source: st.source });
-        S.decided[key] = { kind: "accepted" }; renderPacket();
+        S.decided[key] = { kind: "accepted" }; S.flash = key; renderPacket();
       } catch (e) { toast(e.message); accept.disabled = reject.disabled = false; }
     };
-    reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; sel.focus(); };
+    reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; [sel, note, confirm].forEach((el, i) => rise(el, i * 40, 0)); sel.focus(); };
     confirm.onclick = async () => {
       confirm.disabled = accept.disabled = true;
       try {
         await decide("reject_step", d.case.id, { step: st.step, reason: sel.value, note: note.value.slice(0, 200), source: st.source });
-        S.decided[key] = { kind: "rejected", reason: sel.value }; renderPacket();
+        S.decided[key] = { kind: "rejected", reason: sel.value }; S.flash = key; renderPacket();
       } catch (e) { toast(e.message); confirm.disabled = accept.disabled = false; }
     };
     btns.append(accept, reject, sel, note, confirm);
   }
   li.append(btns);
+  if (S.flash === key) {
+    S.flash = null;
+    const ok = done?.kind === "accepted";
+    anim(li, [{ boxShadow: `0 0 0 3px var(${ok ? "--pass-bg" : "--fail-bg"})`, transform: "scale(1.01)" }, { boxShadow: "0 0 0 0 transparent", transform: "none" }], { duration: 520, fill: "none" });
+    anim(li.querySelector?.(".chip"), [{ opacity: 0, transform: "translateX(-6px)" }, { opacity: 1, transform: "none" }], { duration: 260 });
+  }
   return li;
 }
 function renderPacket() {
@@ -279,7 +327,7 @@ function mapSvg(ser) {
   for (const p of pts) {
     const q = ser.in_queue.includes(p.id), bad = off.has(p.id), cl = ser.cleared?.case_id === p.id;
     const g = svg("g", {}, svg("title", {}, `${p.id} ${p.c.block}`),
-      svg("circle", { cx: px(p), cy: py(p), r: q ? 6 : 4.5, fill: bad ? "#9c1c1c" : q ? "#1d4f91" : "#6b7f99", stroke: cl ? "#155c33" : "#fff", "stroke-width": cl ? 3 : 1.5 }),
+      svg("circle", { cx: px(p), cy: py(p), r: q ? 6 : 4.5, fill: bad ? "#ff5069" : q ? "#6425ff" : "#6b7f99", stroke: cl ? "#22c457" : "#fff", "stroke-width": cl ? 3 : 1.5 }),
       svg("text", { x: px(p) + (px(p) > W - 70 ? -8 : 8), y: py(p) + 3, "text-anchor": px(p) > W - 70 ? "end" : "start" }, shortId(p.id)));
     el.append(g);
   }
@@ -295,9 +343,9 @@ function timelineSvg(ser) {
   const sorted = [...cs].sort((a, b) => a.window_start - b.window_start);
   sorted.forEach((c, i) => {
     const w = Math.max(3, x(c.window_end) - x(c.window_start));
-    el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#1d4f91" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
+    el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#6425ff" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
     if (ser.in_queue.includes(c.id) || ser.cleared?.case_id === c.id)
-      el.append(svg("text", { x: Math.min(x(c.window_start), W - 40), y: 14 }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
+      el.append(svg("text", { x: Math.min(Math.max(x(c.window_start), P), W - P), y: 14, "text-anchor": x(c.window_start) > W - 80 ? "end" : "start" }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
   });
   el.append(svg("text", { x: P, y: H - 3 }, fmtTime(t0)), svg("text", { x: W - P, y: H - 3, "text-anchor": "end" }, fmtTime(t1)));
   return el;
@@ -325,7 +373,7 @@ function renderSeries() {
     h("div", { class: "row-flex" }, sel),
     h("div", { class: "kv" }, ser.rationale),
     ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
-    mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
+    mapSvg(ser), h("p", { class: "map-key" }, "Purple: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
     h("h3", {}, "Link checks"),
     h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
     h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
@@ -393,7 +441,10 @@ function renderTeam() {
 function openDrawer(id) {
   for (const d of document.querySelectorAll(".drawer")) d.hidden = d.id !== id ? true : !d.hidden;
   const d = $(id);
-  if (!d.hidden) d.querySelector("[data-close]").focus();
+  if (!d.hidden) {
+    anim(d, [{ opacity: 0, transform: "translateX(24px)" }, { opacity: 1, transform: "none" }], { duration: 280 });
+    d.querySelector("[data-close]").focus();
+  }
 }
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => { b.closest(".drawer").hidden = true; }));
 $("btn-audit").onclick = async () => { await loadAudit().catch(() => {}); openDrawer("drawer-audit"); };
@@ -407,7 +458,9 @@ function showTab(name) {
     const on = t === name;
     $("tab-" + t).setAttribute("aria-selected", String(on));
     $("tab-" + t).tabIndex = on ? 0 : -1;
-    $("pane-" + t).hidden = !on;
+    const pane = $("pane-" + t), was = pane.hidden;
+    pane.hidden = !on;
+    if (on && was) stagger(pane.children, 25, 6);
   });
 }
 TABS.forEach((t, i) => {
@@ -422,6 +475,7 @@ TABS.forEach((t, i) => {
 
 // ---------------------------------------------------------------- boot
 let selection = 0;
+const data_score = () => S.current?.solvability?.score ?? 0;
 async function selectCase(id) {
   const request = ++selection;
   try {
@@ -431,6 +485,13 @@ async function selectCase(id) {
   } catch (e) { if (request === selection) toast(e.message); return; }
   S.seriesPick = null;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
+  rise($("case-heading"));
+  stagger($("case-card").children, 35, 4);
+  const open = document.querySelector?.(".pane:not([hidden])");
+  if (open) stagger(open.children, 30, 5);
+  countUp($("case-heading").querySelector?.(".summary .score b"), Math.round(data_score()));
+  growBars($("case-heading"));
+  growBars($("case-card"));
   $("case-card").scrollTop = 0;
   document.querySelectorAll(".pane").forEach((p) => { p.scrollTop = 0; });
 }
@@ -443,6 +504,8 @@ async function main() {
     return;
   }
   renderKpi(); renderQueue(); renderTeam();
+  stagger($("queue-list").children, 22, 12);
+  growBars($("queue-list"));
   await loadAudit().catch(() => {});
   const first = new URLSearchParams(location.search).get("case") || S.queue.cases[0]?.id;
   if (first) await selectCase(first);
