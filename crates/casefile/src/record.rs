@@ -192,6 +192,9 @@ fn exec(bin: &Path, argv: &[String], prompt: &str, cwd: &Path) -> anyhow::Result
     let mut child = Command::new(bin)
         .args(argv)
         .current_dir(cwd)
+        // Keep CLAUDE.md files and auto-memory out of the agent's context (see build_argv).
+        .env("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "1")
+        .env("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -247,11 +250,17 @@ pub fn build_argv(def: &AgentDef, model: &str, system_file: &Path, schema: &Valu
         // Built-in tools off; only the listed MCP tools are reachable.
         "--tools".into(),
         String::new(),
+        // Isolation + prompt caching: without these the run inherits the operator's hooks, plugins,
+        // skills and MCP servers (~11K extra tokens), and the volatile parts (git status, hook
+        // output) re-write the cache every run. `--bare` would do this but needs ANTHROPIC_API_KEY.
+        "--setting-sources".into(),
+        String::new(),
+        "--strict-mcp-config".into(),
+        "--disable-slash-commands".into(),
     ];
     if let Some(p) = mcp {
         a.push("--mcp-config".into());
         a.push(p.to_string_lossy().into_owned());
-        a.push("--strict-mcp-config".into());
         let tools: Vec<String> = def.allowed_tools.iter().map(|t| format!("mcp__casefile__{t}")).collect();
         a.push("--allowedTools".into());
         a.push(tools.join(","));
@@ -400,6 +409,11 @@ mod tests {
         let i = a.iter().position(|x| x == "--tools").unwrap();
         assert_eq!(a[i + 1], "");
         assert!(!a.iter().any(|x| x == "--mcp-config"));
+        // Isolated from the operator's settings, MCP servers and skills (cache-stable prefix).
+        assert!(a.contains(&"--strict-mcp-config".to_string()));
+        assert!(a.contains(&"--disable-slash-commands".to_string()));
+        let ss = a.iter().position(|x| x == "--setting-sources").unwrap();
+        assert_eq!(a[ss + 1], "");
         assert!(a.contains(&"--no-session-persistence".to_string()));
         assert!(a.contains(&"stream-json".to_string()));
         assert!(a.contains(&"--verbose".to_string()));
