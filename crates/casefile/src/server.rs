@@ -560,16 +560,38 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-pub async fn run(args: &[String]) -> anyhow::Result<()> {
-    let port: u16 = match crate::flag(args, "--port") {
-        Some(p) => p.parse().map_err(|_| anyhow::anyhow!("--port must be a number, got '{p}'"))?,
+/// Entries a hosted (`--public`) demo keeps before refusing more.
+const PUBLIC_AUDIT_CAP: usize = 200;
+
+/// Listen address: `--host`, else `0.0.0.0` when `--public`/`CASEFILE_PUBLIC=1`, else loopback.
+/// Port: `--port`, else `$PORT` (set by Render, Fly, Railway, Heroku), else 8080.
+pub fn listen_addr(args: &[String]) -> anyhow::Result<(String, u16, bool)> {
+    let public = crate::has(args, "--public") || std::env::var("CASEFILE_PUBLIC").is_ok_and(|v| v == "1");
+    let port_s = crate::flag(args, "--port").or_else(|| std::env::var("PORT").ok());
+    let port: u16 = match port_s {
+        Some(p) => p.parse().map_err(|_| anyhow::anyhow!("port must be a number, got '{p}'"))?,
         None => 8080,
     };
+    let host = crate::flag(args, "--host").unwrap_or_else(|| if public { "0.0.0.0".into() } else { "127.0.0.1".into() });
+    Ok((host, port, public))
+}
+
+pub async fn run(args: &[String]) -> anyhow::Result<()> {
+    let (host, port, public) = listen_addr(args)?;
     let root = crate::root();
     let store = Store::load(&root)?;
-    let app = Arc::new(App::build(&root, store, AuditLog::open(&root)));
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-    eprintln!("casefile console: http://127.0.0.1:{port}/  (synthetic data)");
+    let audit = if public {
+        // Public demo: audit entries go to a throwaway directory, capped, and reset on every start,
+        // so visitors never touch the repo's data/audit.jsonl and cannot grow it without bound.
+        let dir = std::env::temp_dir().join("casefile-public-demo");
+        let _ = std::fs::remove_dir_all(&dir);
+        AuditLog::open(&dir).with_cap(PUBLIC_AUDIT_CAP)
+    } else {
+        AuditLog::open(&root)
+    };
+    let app = Arc::new(App::build(&root, store, audit));
+    let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await?;
+    eprintln!("casefile console: http://{host}:{port}/  (synthetic data{})", if public { ", public mode" } else { "" });
     axum::serve(listener, router(app)).await?;
     Ok(())
 }

@@ -1,0 +1,10 @@
+target
+.git
+.claude
+media
+deliverables
+docs
+evals
+discord
+data/audit.jsonl
+data/public

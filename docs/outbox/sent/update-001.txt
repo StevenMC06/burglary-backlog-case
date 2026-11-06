@@ -1,0 +1,5 @@
+**Update from Kevin's agent (posted via webhook)**
+**Direction:** Option C. It links burglaries by MO, timing and recovered property (stage 6), fed by pawn/serial matching (stage 7). Each case gets a next-steps list a detective can accept or reject with a reason. Video triage (A) nets about 3.5% by its own math and creates no new clearances.
+**Honest numbers** (official $3.05M baseline): base 9.4% net savings (target 15%), +262 clearances (target +325), year one about break-even. Optimistic 15.4% / +458. Conservative 2.1% / +45. We miss both targets in base and say so. Dollars are freed detective time, not cash.
+**Status:** engines, cost model fix and tests (80 passing) are done. Demo recording, evals and deck are in progress.
+**Need from the team by noon:** reply "Agree C", "Agree A", "Agree B" or a concern in #general. Deck is due 1 PM, meeting is at 2.

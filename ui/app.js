@@ -35,8 +35,8 @@ async function api(path, opts) {
 }
 const fmtTime = (s) => (s == null ? "" : new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") + "Z");
 const pct = (x) => (x * 100).toFixed(1) + "%";
-const money = (x) => "$" + Math.round(x).toLocaleString("en-US");
 const shortId = (id) => id.replace(/^CC-/, "");
+const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX");
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -72,27 +72,22 @@ function renderKpi() {
 }
 
 // ---------------------------------------------------------------- queue
-const bandChip = (b) => h("span", { class: "chip " + (b === "strong" ? "pass" : b === "moderate" ? "weak" : "info") }, b);
-function pawnChip(st) {
-  if (!st) return null;
-  const m = { exact_serial_lead: ["pass", "serial lead"], review_candidate_marking: ["weak", "marking review"],
-    rejected_conflicting_serial: ["fail", "serial conflict"], unresolved_similar_description: ["info", "similar only"] }[st];
-  return m ? h("span", { class: "chip " + m[0] }, m[1]) : null;
-}
 function renderQueue() {
   const q = S.queue;
-  $("queue-count").textContent = `(${q.cases.length})`;
-  const note = $("queue-note");
-  note.hidden = q.ai_recorded;
-  note.textContent = "AI run not recorded. Engine results shown.";
+  const query = $("queue-search").value.trim().toLowerCase();
+  const cases = q.cases.filter((c) => `${c.id} ${c.neighborhood} ${c.block}`.toLowerCase().includes(query));
+  $("queue-count").textContent = query ? `${cases.length}/${q.cases.length}` : q.cases.length;
+  $("queue-empty").hidden = cases.length > 0;
   const ul = $("queue-list");
   ul.replaceChildren(
-    ...q.cases.map((c) => {
+    ...cases.map((c) => {
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
-        h("span", { class: "l1" }, h("span", {}, c.id), h("span", { class: "num" }, c.solvability.score.toFixed(0))),
-        h("span", { class: "l2" }, `${c.neighborhood} · ${c.block}`),
-        h("span", { class: "flags" }, bandChip(c.solvability.band),
-          c.flags.series_id ? h("span", { class: "chip info" }, "series " + c.flags.series_id) : null, pawnChip(c.flags.pawn_hit)));
+        h("span", { class: "l1" }, c.id),
+        h("span", { class: "l2" }, human(c.block)),
+        h("span", { class: "l3" }, human(c.neighborhood)),
+        (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
+          c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
+          c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
       return h("li", {}, btn);
     })
   );
@@ -104,29 +99,12 @@ function renderQueue() {
     if (n) { e.preventDefault(); n.focus(); }
   };
 }
+$("queue-search").oninput = () => { if (S.queue) renderQueue(); };
 function markCurrent() {
   document.querySelectorAll(".qbtn").forEach((b) => b.setAttribute("aria-current", String(b.dataset.id === S.current?.case.id)));
 }
 
 // ---------------------------------------------------------------- case card
-const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function highlight(text, d) {
-  const terms = [];
-  for (const it of d.case.items) {
-    if (it.brand) terms.push(esc(it.brand + (it.model ? " " + it.model : "")));
-  }
-  const parts = [...terms, "entered via [^.;]+", "\\$\\d[\\d,]*", "between \\d{4}-\\d{4}", "(?:Ransacked|used pillowcase|disabled)[^.;]*"];
-  const re = new RegExp("(" + parts.join("|") + ")", "gi");
-  const out = [];
-  let last = 0, m;
-  while ((m = re.exec(text))) {
-    if (!m[0]) { re.lastIndex++; continue; }
-    out.push(text.slice(last, m.index), h("mark", {}, m[0]));
-    last = m.index + m[0].length;
-  }
-  out.push(text.slice(last));
-  return out;
-}
 function bars(contribs) {
   const max = Math.max(1, ...contribs.map((c) => Math.abs(c[1])));
   const kids = [];
@@ -142,39 +120,45 @@ function pawnCard(p) {
   const m = p.match, st = m.status;
   const cls = st === "exact_serial_lead" ? "lead" : st === "rejected_conflicting_serial" ? "trap" : "";
   const title = { exact_serial_lead: ["pass", "Exact serial lead"], rejected_conflicting_serial: ["fail", "Rejected: conflicting serial"],
-    review_candidate_marking: ["weak", "Review candidate (marking)"], unresolved_similar_description: ["info", "Unresolved: description only"] }[st];
+    review_candidate_marking: ["weak", "Shared marking"], unresolved_similar_description: ["info", "Description only"] }[st];
   return h("div", { class: "card " + cls },
     h("div", { class: "row-flex" }, h("span", { class: "chip " + title[0] }, title[1]), h("span", { class: "mono" }, m.pawn_id),
-      h("span", { class: "kv" }, `${m.days_after_offense.toFixed(1)} days after offense window`)),
-    h("div", { class: "kv" }, "Stolen: ", h("span", { class: "mono" }, p.item?.serial || "no serial"), " (", m.item_id, ")  Pawned: ",
-      h("span", { class: "mono" }, p.pawn?.serial || "no serial"), p.pawn ? `  at ${p.pawn.dealer}` : ""),
-    h("div", {}, m.reason),
-    st === "exact_serial_lead" ? h("div", { class: "kv" }, "A lead, not verified ownership. Seller ref is opaque and a seller is not presumed to be the burglar.") : null,
-    st === "rejected_conflicting_serial" ? h("div", { class: "kv" }, "Never a match, whatever the description says.") : null);
+      h("span", { class: "kv" }, `+${m.days_after_offense.toFixed(0)} ${Math.round(m.days_after_offense) === 1 ? "day" : "days"}`)),
+    h("div", {}, p.item?.description || m.item_id),
+    h("div", { class: "serials" },
+      h("div", {}, h("span", { class: "kv" }, "Reported serial"), h("span", { class: "mono" }, p.item?.serial || "Not recorded")),
+      h("div", {}, h("span", { class: "kv" }, "Pawn serial"), h("span", { class: "mono" }, p.pawn?.serial || "Not recorded"))),
+    p.pawn ? h("div", { class: "kv" }, p.pawn.dealer) : null,
+    h("details", { class: "step-details" }, h("summary", {}, "Match details"), h("p", {}, m.reason),
+      st === "exact_serial_lead" ? h("p", {}, "Ownership unverified. Seller is not presumed to be the offender.") : null));
 }
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
-  const ex = d.recorded.extractor;
+  fill($("case-heading"),
+    h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
+    h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
+    h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`));
   fill(box, 
-    h("div", { class: "case-head" }, h("span", { class: "id" }, c.id), bandChip(s.band),
-      h("span", { class: "kv" }, `${c.neighborhood} · ${c.block} · beat ${c.beat}`),
-      h("span", { class: "kv" }, `window ${fmtTime(c.window_start)} to ${fmtTime(c.window_end)} · reported ${fmtTime(c.reported_at)}`)),
-    h("h2", {}, "Narrative ", ex ? h("span", { class: "chip pass" }, "extractor recorded") : h("span", { class: "chip info" }, "AI extraction not recorded")),
-    h("p", { class: "narr" }, highlight(c.narrative, d)),
-    h("h2", {}, "Solvability"),
-    h("div", { class: "score-line" }, h("span", { class: "score-big" }, s.score.toFixed(0) + " / 100"), bandChip(s.band),
-      h("span", { class: "kv" }, "Contributions in score points. Deterministic engine; same inputs, same score.")),
-    bars(s.contributions),
-    h("h2", { style: "margin-top:10px" }, "Property hits"),
-    d.pawn.length ? d.pawn.map(pawnCard) : h("p", { class: "empty" }, "No secondhand-feed matches."),
-    h("h2", { style: "margin-top:10px" }, "Linked cases (top 5 by engine score)"),
-    d.similar.map((x) => {
+    h("section", { class: "case-section" }, h("h2", {}, "Report"),
+      h("p", { class: "narr" }, c.narrative),
+      h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
+    h("section", { class: "case-section" }, h("h2", {}, "Property"),
+      d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
+      d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
+      d.pawn.some((p) => p.match.status === "rejected_conflicting_serial") ?
+        h("details", { class: "disclosure" }, h("summary", {}, `${d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").length} excluded records`),
+          d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").map(pawnCard)) : null),
+    h("section", { class: "case-section" }, h("h2", {}, "Related cases"),
+    d.similar.length ? d.similar.map((x) => {
       const o = x.other, p = x.pair;
       return h("div", { class: "linked" },
-        h("span", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(o.id) }, o.id), ` ${o.neighborhood}`),
-        h("span", { class: "kv" }, `score ${p.score.toFixed(2)} · ${p.components.distance_km.toFixed(1)} km · ${p.components.days_apart.toFixed(0)} d · ${p.components.shared_signatures} shared sigs`));
-    })
+        h("span", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(o.id) }, o.id), h("span", { class: "kv" }, human(o.neighborhood))),
+        h("span", { class: "kv", title: `Similarity ${p.score.toFixed(2)}; ${p.components.shared_signatures} shared signatures` }, `${p.components.distance_km.toFixed(1)} km · ${p.components.days_apart.toFixed(0)} d`));
+    }) : h("p", { class: "empty" }, "No related cases.")),
+    h("details", { class: "disclosure" }, h("summary", {}, "Review factors"),
+      h("div", { class: "score-line" }, h("b", {}, s.score.toFixed(0) + " / 100"), h("span", { class: "kv" }, "Solvability score")), bars(s.contributions),
+      h("p", { class: "kv" }, `Reported ${fmtTime(c.reported_at)} · Extraction ${d.recorded.extractor ? "recorded" : "unavailable"}`))
   );
 }
 
@@ -197,20 +181,22 @@ function citeChips(text, d) {
   return out;
 }
 function missing(label) {
-  return h("div", { class: "ai-missing" }, h("b", {}, "AI run not recorded"), ` for ${label}. The engine results are shown without the AI summary.`);
+  return h("p", { class: "ai-missing" }, `No recorded ${label.replace(/^the /, "")}.`);
 }
 async function decide(action, subject, detail) {
   const r = await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ actor: ACTOR, action, subject, detail }) });
-  await loadAudit();
-  toast(`Recorded: ${action} (audit #${r.entry.seq})`);
+  await loadAudit().catch(() => toast("Decision saved. Activity could not refresh."));
+  toast(`Decision saved · #${r.entry.seq}`);
   return r;
 }
 function stepItem(st, i, d) {
   const key = `${d.case.id}#${i}`;
   const done = S.decided[key];
   const li = h("li", { class: "step " + (done ? done.kind : "") });
-  const body = h("div", {}, h("b", {}, st.step), h("div", { class: "kv" }, st.why), h("div", { class: "kv" }, "Lawful basis: " + st.lawful_basis_note + ` · ~${st.est_minutes} min · ${st.source}`));
+  const body = h("div", {}, h("div", { class: "step-title" }, st.step),
+    h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
+      h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
   li.append(body);
   const btns = h("div", { class: "btns" });
   if (done) {
@@ -220,15 +206,21 @@ function stepItem(st, i, d) {
     const note = h("input", { type: "text", "aria-label": "Reject note", placeholder: "note (optional)", hidden: true, size: "14" });
     const confirm = h("button", { type: "button", class: "btn sm danger", hidden: true }, "Confirm reject");
     const accept = h("button", { type: "button", class: "btn sm primary" }, "Accept");
-    const reject = h("button", { type: "button", class: "btn sm danger" }, "Reject...");
+    const reject = h("button", { type: "button", class: "btn sm" }, "Reject");
     accept.onclick = async () => {
-      await decide("accept_step", d.case.id, { step: st.step, source: st.source }).catch((e) => toast(e.message));
-      S.decided[key] = { kind: "accepted" }; renderPacket();
+      accept.disabled = reject.disabled = true;
+      try {
+        await decide("accept_step", d.case.id, { step: st.step, source: st.source });
+        S.decided[key] = { kind: "accepted" }; renderPacket();
+      } catch (e) { toast(e.message); accept.disabled = reject.disabled = false; }
     };
     reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; sel.focus(); };
     confirm.onclick = async () => {
-      await decide("reject_step", d.case.id, { step: st.step, reason: sel.value, note: note.value.slice(0, 200), source: st.source }).catch((e) => toast(e.message));
-      S.decided[key] = { kind: "rejected", reason: sel.value }; renderPacket();
+      confirm.disabled = accept.disabled = true;
+      try {
+        await decide("reject_step", d.case.id, { step: st.step, reason: sel.value, note: note.value.slice(0, 200), source: st.source });
+        S.decided[key] = { kind: "rejected", reason: sel.value }; renderPacket();
+      } catch (e) { toast(e.message); confirm.disabled = accept.disabled = false; }
     };
     btns.append(accept, reject, sel, note, confirm);
   }
@@ -239,16 +231,17 @@ function renderPacket() {
   const d = S.current, pane = $("pane-packet");
   const pk = d.recorded.packet_writer, tr = d.recorded.triage;
   fill(pane, 
-    h("h2", {}, "Lead packet"),
-    pk ? [h("div", { class: "row-flex" }, h("span", { class: "chip " + (pk.output.citations_ok ? "pass" : "weak") }, pk.output.citations_ok ? "citations ok" : "citations need review"),
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
+    tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
+    h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d))),
+    h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
+    pk ? [h("div", { class: "row-flex" }, pk.output.citations_ok ? null : h("span", { class: "chip weak" }, "Citations need review"),
         h("span", { class: "kv" }, `${pk.model} · $${pk.cost_usd.toFixed(3)} · ${(pk.duration_ms / 1000).toFixed(0)}s`),
-        h("button", { type: "button", class: "btn sm", onclick: () => replay("packet_writer", d.case.id) }, "Replay run")),
+        h("button", { type: "button", class: "btn sm", onclick: () => replay("packet_writer", d.case.id) }, "Replay")),
       h("div", { class: "packet-text" }, citeChips(pk.output.packet_markdown || "", d))]
       : missing("the lead packet"),
-    tr ? h("div", { class: "row-flex" }, h("span", { class: "chip info" }, "triage: " + tr.output.disposition), h("span", { class: "kv" }, tr.output.rationale_with_citations)) : null,
-    h("div", { id: "replay-box" }),
-    h("h2", { style: "margin-top:8px" }, "Next steps ", h("span", { class: "muted" }, tr ? "(from triage run)" : "(engine suggestions)")),
-    h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d)))
+    h("div", { id: "replay-box" })),
+    tr ? h("details", { class: "disclosure" }, h("summary", {}, "Triage rationale"), h("p", { class: "kv" }, tr.output.rationale_with_citations)) : null
   );
 }
 async function replay(agent, id) {
@@ -287,7 +280,6 @@ function mapSvg(ser) {
       svg("text", { x: px(p) + (px(p) > W - 70 ? -8 : 8), y: py(p) + 3, "text-anchor": px(p) > W - 70 ? "end" : "start" }, shortId(p.id)));
     el.append(g);
   }
-  el.append(svg("text", { x: 4, y: H - 5 }, "Projected lat/lon, no tiles. Blue = queue case, red = offending, green ring = cleared by arrest"));
   return el;
 }
 function timelineSvg(ser) {
@@ -320,19 +312,23 @@ function renderSeries() {
   const done = S.decided[key];
   const approve = h("button", { type: "button", class: "btn primary", disabled: v.verdict === "fail" || !!done }, done ? "Series alert approved" : "Approve series alert");
   approve.onclick = async () => {
-    await decide("approve_series_alert", ser.id, { case_ids: ser.case_ids, verdict: v.verdict }).catch((e) => toast(e.message));
-    S.decided[key] = { kind: "accepted" }; renderSeries();
+    approve.disabled = true;
+    try {
+      await decide("approve_series_alert", ser.id, { case_ids: ser.case_ids, verdict: v.verdict });
+      S.decided[key] = { kind: "accepted" }; renderSeries();
+    } catch (e) { toast(e.message); approve.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "row-flex" }, h("label", {}, "Series ", sel), h("span", { class: "chip " + (v.verdict === "pass" ? "pass" : v.verdict === "weak" ? "weak" : "fail") }, "verifier: " + v.verdict)),
-    h("div", { class: "kv" }, ser.rationale, ` (proposed by ${ser.proposed_by})`),
-    ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id}, arrestee ref ${ser.cleared.arrestee_ref} (opaque).`) : null,
-    mapSvg(ser), timelineSvg(ser),
-    h("h3", {}, "Verify checks"),
+    h("div", { class: "row-flex" }, sel),
+    h("div", { class: "kv" }, ser.rationale),
+    ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
+    mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
+    h("h3", {}, "Link checks"),
     h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
-    h("h3", {}, "Skeptic's note"),
-    ser.skeptic && sk ? h("div", { class: "card" }, h("span", { class: "chip " + (sk.keep ? "pass" : "fail") }, sk.keep ? "keep" : "drop"), " ", sk.reasons_with_citations) : missing("the skeptic"),
-    h("div", { class: "row-flex" }, approve, h("span", { class: "kv" }, v.verdict === "fail" ? "Disabled: the verifier failed this hypothesis." : "Drafts a patrol alert; people approve."))
+    h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
+      ser.skeptic && sk ? h("p", { class: "kv" }, sk.reasons_with_citations) : missing("the independent review")),
+    h("div", { class: "row-flex" }, approve),
+    v.verdict === "fail" ? h("p", { class: "kv" }, "Approval blocked by failed link checks.") : null
   );
 }
 
@@ -346,17 +342,18 @@ function renderVictim() {
   const done = S.decided[key];
   const btn = h("button", { type: "button", class: "btn primary", disabled: !!done }, done ? "Approved" : "Approve update");
   btn.onclick = async () => {
-    await decide("approve_victim_update", d.case.id, { language: lang, source: rec ? "victim_liaison" : "engine_template" }).catch((e) => toast(e.message));
-    S.decided[key] = { kind: "accepted" }; renderVictim();
+    btn.disabled = true;
+    try {
+      await decide("approve_victim_update", d.case.id, { language: lang, source: rec ? "victim_liaison" : "engine_template" });
+      S.decided[key] = { kind: "accepted" }; renderVictim();
+    } catch (e) { toast(e.message); btn.disabled = false; }
   };
   fill(pane, 
-    h("h2", {}, "Victim update draft"),
-    h("div", { class: "row-flex" }, h("span", { class: "chip info" }, "language: " + lang), h("span", { class: "chip weak" }, "draft: not sent"),
-      rec ? h("span", { class: "chip pass" }, "AI draft") : h("span", { class: "chip info" }, "engine template")),
-    rec ? null : missing("the victim liaison"),
+    h("div", { class: "section-head" }, h("h2", {}, "Victim update"), h("span", {}, `Draft · ${lang.toUpperCase()}`)),
+    rec ? null : h("p", { class: "kv" }, "Standard template · No recorded draft"),
     h("div", { class: "packet-text", lang: lang }, msg),
     rec?.output.plain_english_summary ? h("div", { class: "kv" }, "English summary: " + rec.output.plain_english_summary) : null,
-    h("div", { class: "kv" }, "No suspect information, no promises. Nothing is sent until a person approves."),
+    h("div", { class: "kv" }, "Approval is recorded. Delivery is not connected."),
     h("div", { class: "row-flex" }, btn)
   );
 }
@@ -366,8 +363,9 @@ async function loadAudit() {
   const a = await api("/api/audit");
   const ok = a.chain.intact;
   const chip = $("audit-chip");
-  chip.className = "chip " + (ok ? "pass" : "fail");
-  chip.textContent = ok ? `chain intact ✓ (${a.chain.entries} entries)` : `chain BROKEN at #${a.chain.first_bad_seq}`;
+  chip.className = "activity-count";
+  chip.textContent = ok ? a.chain.entries : "!";
+  chip.title = ok ? "Audit chain intact" : `Audit chain broken at #${a.chain.first_bad_seq}`;
   $("audit-status").textContent = ok ? `Chain intact ✓ (${a.chain.entries} entries)` : `Chain broken at entry #${a.chain.first_bad_seq}`;
   $("audit-status").className = "status " + (ok ? "ok" : "bad");
   $("audit-list").replaceChildren(...[...a.entries].reverse().map((e) => h("li", {},
@@ -382,10 +380,11 @@ function renderTeam() {
     tools.map((x) => (a.tools.includes(x) ? h("td", { class: "on", title: `${a.name} calls ${x}` }, "●") : h("td", {}, ""))),
     t.channels.map((c) => (c.drafted_by.includes(a.name) ? h("td", { class: "gate", title: "Draft needs human approval" }, "◐") : h("td", {}, "")))));
   fill($("team-body"), 
-    h("p", { class: "kv" }, "Many-to-many: each agent gets only the MCP tools it needs. ● = agent calls the tool. ◐ = agent drafts to a channel; a person must approve before anything leaves."),
+    h("h3", {}, "Agents & connectors"),
+    h("p", { class: "kv" }, "● Tool access · ◐ Draft channel"),
     h("table", {}, h("thead", {}, head), h("tbody", {}, rows)),
     t.channels.map((c) => h("p", {}, h("b", {}, c.label), ` via ${c.via}: ${c.note}`)),
-    h("p", { class: "kv" }, "Agents propose; the deterministic engine verifies; people decide. series_llm_only is the baseline with no tools, used for comparison.")
+    h("p", { class: "kv" }, "series_llm_only is the evaluation baseline.")
   );
 }
 function openDrawer(id) {
@@ -419,19 +418,25 @@ TABS.forEach((t, i) => {
 });
 
 // ---------------------------------------------------------------- boot
+let selection = 0;
 async function selectCase(id) {
+  const request = ++selection;
   try {
-    S.current = await api("/api/case/" + encodeURIComponent(id));
-  } catch (e) { toast(e.message); return; }
+    const data = await api("/api/case/" + encodeURIComponent(id));
+    if (request !== selection) return;
+    S.current = data;
+  } catch (e) { if (request === selection) toast(e.message); return; }
   S.seriesPick = null;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
+  $("case-card").scrollTop = 0;
+  document.querySelectorAll(".pane").forEach((p) => { p.scrollTop = 0; });
 }
 async function main() {
   try {
     const [queue, series, kpi, team] = await Promise.all([api("/api/queue"), api("/api/series"), api("/api/kpi"), api("/api/team")]);
     Object.assign(S, { queue, series, kpi, team });
   } catch (e) {
-    $("case-card").replaceChildren(h("p", { class: "empty" }, "Could not load data: " + e.message));
+    $("case-heading").replaceChildren(h("p", { class: "empty" }, "Could not load cases: " + e.message));
     return;
   }
   renderKpi(); renderQueue(); renderTeam();

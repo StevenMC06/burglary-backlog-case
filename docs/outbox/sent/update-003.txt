@@ -1,0 +1,8 @@
+**Deck and demo are built (attached). Please review before the 1 PM deadline.**
+- Deck: 9-slide PDF (casefile_deck.pdf).
+- Demo: 63 s video with voiceover (demo.mp4), recorded from real agent runs on synthetic data.
+- Eval report and cost model results attached (eval_report.md, cost.json).
+**Headline claims in the deck:** Option C, case linkage plus pawn matching. Base case 9.4% net savings (target 15%) and +262 clearances (target +325). We miss both and say so. Series linkage at threshold 0.9: precision 66%, recall 100%, 38/40 series; verify_series rejected 10/10 decoys; exact-serial pawn leads 100/100 correct. A single LLM pass roughly matches our F1, but accepted decoy pairs we reject; the deck says that plainly. Synthetic data only.
+**Known gaps (stated in the deck or report):** no patrol hands-free channel built; time-of-day extraction 58%; 50% follow-up conversion is an unbenchmarked assumption; no real-data near-repeat check yet.
+**Team: please read the deck and reply here or in #general with any claim you don't want us to defend.** We still need "Agree C" (or A/B, or a concern) before noon. Kevin submits the deck to ddolev@uw.edu by 1:00 PM; meeting is about 2 PM; pitch 3:03 PM, DEM 004.
+Nothing has been pushed to GitHub or submitted yet. Files will also be in the Drive folder: https://drive.google.com/drive/folders/1SiAg0EsO5PNkBxQg_RHpHVzxv5jDH5FR?usp=sharing

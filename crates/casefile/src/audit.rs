@@ -34,11 +34,19 @@ fn digest(e: &Entry) -> String {
 
 pub struct AuditLog {
     path: PathBuf,
+    /// Hosted demos cap the log so a public visitor cannot grow it without bound.
+    cap: Option<usize>,
 }
 
 impl AuditLog {
     pub fn open(root: &Path) -> Self {
-        Self { path: root.join("data/audit.jsonl") }
+        Self { path: root.join("data/audit.jsonl"), cap: None }
+    }
+
+    /// Refuse appends once the log holds `cap` entries.
+    pub fn with_cap(mut self, cap: usize) -> Self {
+        self.cap = Some(cap);
+        self
     }
 
     pub fn entries(&self) -> Vec<Entry> {
@@ -57,6 +65,9 @@ impl AuditLog {
         detail: serde_json::Value,
     ) -> anyhow::Result<Entry> {
         let all = self.entries();
+        if self.cap.is_some_and(|c| all.len() >= c) {
+            anyhow::bail!("the demo audit log is full ({} entries); restart the demo to reset it", all.len());
+        }
         let (seq, prev) =
             all.last().map(|e| (e.seq + 1, e.hash.clone())).unwrap_or((0, "genesis".into()));
         let ts = std::time::SystemTime::now()

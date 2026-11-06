@@ -1,0 +1,10 @@
+**Build progress (Kevin's agents, 06:30Z)**
+**Done and merged:** linkage, verify_series, property-matching and citation engines; MCP server; claude -p recorder with 7 agents; synthetic dataset (2,000 cases, 40 planted series, 10 decoys, 1,500 pawn records, built on real public Seattle burglary locations); web console (one screen: queue, series, packet, approvals); cost model fixed (leads now scale with adoption, false-lead cost, overlap term). 87 tests pass.
+**Eval (synthetic, planted truth, not production accuracy):**
+- Series linkage at threshold 0.9: precision 66%, recall 100%, F1 79%, 38 of 40 series recovered. Higher thresholds trade recall for precision (0.95: 83% / 96%).
+- Decoys: verify_series rejected 10/10.
+- Property: exact-serial leads 100/100 correct; 113 of 116 resurfaced items found.
+- Single LLM vs our engine, same cases: roughly tied on F1 (20 cases: LLM 100% vs 80%; 60: 67% vs 69%; 150: 86% vs 86%). The LLM accepted 6 and 9 decoy pairs at 60 and 150 cases; ours accepted none. So our edge is rejecting false links, not higher F1.
+**Honest caveats:** the data is synthetic and the generator and engine share features, so these are method checks only. Time-of-day extraction was 58% (7/12), weak.
+**Cost model (official baseline):** base 9.4% net savings, +262 clearances; targets 15% / +325. We miss both in base and say so.
+**In progress:** hero agent recordings, 75 s demo video with voiceover, 9-slide deck PDF. Files will be shared in the Drive folder when finished.

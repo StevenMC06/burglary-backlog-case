@@ -1,0 +1,7 @@
+# Render Blueprint: New > Blueprint > pick this repo. Free plan, no env secrets needed.
+services:
+  - type: web
+    name: casefile-demo
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/kpi

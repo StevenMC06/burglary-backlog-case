@@ -3,54 +3,57 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Casefile: overnight burglary review (synthetic data)</title>
+<title>Casefile · Case review</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<div class="banner" role="note">Synthetic data: Cascade City (fictional). AI suggests, people decide.</div>
-
 <header class="topbar">
-  <h1>Casefile <span class="sub">overnight burglary review</span></h1>
-  <section id="kpi" class="kpi" aria-label="Cost and clearance estimates"></section>
+  <h1><span class="brand-mark" aria-hidden="true">C</span> Casefile</h1>
+  <span class="workspace-name">Property crimes</span>
+  <span class="demo-label">Synthetic data · Cascade City</span>
   <div class="actions">
-    <button id="btn-team" type="button" class="btn" aria-haspopup="dialog">AI team</button>
-    <button id="btn-audit" type="button" class="btn" aria-haspopup="dialog">Audit <span id="audit-chip" class="chip">loading</span></button>
+    <button id="btn-team" type="button" class="btn" aria-haspopup="dialog">System</button>
+    <button id="btn-audit" type="button" class="btn" aria-haspopup="dialog">Activity <span id="audit-chip" class="activity-count"></span></button>
   </div>
 </header>
 
 <main class="grid">
   <nav class="col queue" aria-label="Overnight queue">
-    <h2>Overnight queue <span id="queue-count" class="muted"></span></h2>
-    <p id="queue-note" class="note" hidden></p>
+    <div class="queue-head"><h2>Inbox <span id="queue-count" class="count"></span></h2><span class="muted">Overnight</span></div>
+    <input id="queue-search" type="search" placeholder="Search cases" aria-label="Search cases by ID or location" autocomplete="off">
     <ul id="queue-list" class="queue-list"></ul>
+    <p id="queue-empty" class="empty" hidden>No cases found.</p>
   </nav>
 
-  <section class="col case" id="case-card" aria-label="Case card" aria-live="polite">
-    <p class="empty">Loading queue...</p>
-  </section>
-
-  <section class="col right" aria-label="Packet, series and victim update">
+  <section class="workspace" aria-label="Case workspace">
+    <header id="case-heading" class="case-heading" aria-live="polite"><p class="empty">Loading cases…</p></header>
+    <div class="case-body">
+    <section class="case" id="case-card" aria-label="Case details"></section>
+    <section class="right" aria-label="Case actions">
     <div class="tabs" role="tablist" aria-label="Right panel">
-      <button role="tab" id="tab-packet" aria-controls="pane-packet" aria-selected="true" tabindex="0">Lead packet</button>
+      <button role="tab" id="tab-packet" aria-controls="pane-packet" aria-selected="true" tabindex="0">Next steps</button>
       <button role="tab" id="tab-series" aria-controls="pane-series" aria-selected="false" tabindex="-1">Series</button>
       <button role="tab" id="tab-victim" aria-controls="pane-victim" aria-selected="false" tabindex="-1">Victim update</button>
     </div>
     <div id="pane-packet" role="tabpanel" aria-labelledby="tab-packet" class="pane" tabindex="0"></div>
     <div id="pane-series" role="tabpanel" aria-labelledby="tab-series" class="pane" tabindex="0" hidden></div>
     <div id="pane-victim" role="tabpanel" aria-labelledby="tab-victim" class="pane" tabindex="0" hidden></div>
+    </section>
+    </div>
   </section>
 </main>
 
 <aside id="drawer-audit" class="drawer" role="dialog" aria-modal="false" aria-labelledby="audit-title" hidden>
-  <div class="drawer-head"><h2 id="audit-title">Audit log</h2><button type="button" class="btn" data-close>Close</button></div>
+  <div class="drawer-head"><h2 id="audit-title">Activity</h2><button type="button" class="btn" data-close>Close</button></div>
   <p id="audit-status" class="status"></p>
   <ol id="audit-list" class="audit-list"></ol>
 </aside>
 
 <aside id="drawer-team" class="drawer wide" role="dialog" aria-modal="false" aria-labelledby="team-title" hidden>
-  <div class="drawer-head"><h2 id="team-title">AI team and tool channels</h2><button type="button" class="btn" data-close>Close</button></div>
+  <div class="drawer-head"><h2 id="team-title">System</h2><button type="button" class="btn" data-close>Close</button></div>
   <div id="team-body"></div>
+  <details class="disclosure"><summary>Cost scenarios</summary><section id="kpi" class="kpi" aria-label="Cost and clearance estimates"></section></details>
 </aside>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
