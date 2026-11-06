@@ -25,7 +25,7 @@ const context = vm.createContext({ document, setTimeout() {}, clearTimeout() {} 
 const script = fs.readFileSync(__dirname + '/app.js', 'utf8');
 assert.match(script, /\nmain\(\);\s*$/);
 vm.runInContext(script.replace(/\nmain\(\);\s*$/, ''), context);
-const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem })', context);
+const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem, showEvidence, activityItem, readableReport })', context);
 function find(node, text) {
   if (node.tag === 'button' && node.textContent === text) return node;
   for (const child of node.children || []) { const result = find(child, text); if (result) return result; }
@@ -41,6 +41,20 @@ module.exports = (async () => {
   assert.equal(elements.get('queue-list').children.length, 0);
   assert.equal(elements.get('queue-empty').hidden, false);
 
+  app.showEvidence('property');
+  assert.equal(elements.get('evidence-property').hidden, false);
+  assert.equal(elements.get('evidence-report').hidden, true);
+  assert.equal(elements.get('evidence-tab-property').attrs['aria-selected'], 'true');
+  assert.equal(elements.get('evidence-tab-report').tabIndex, -1);
+  elements.get('evidence-tab-property').onkeydown({ key: 'ArrowRight', preventDefault() {} });
+  assert.equal(elements.get('evidence-related').hidden, false, 'Arrow keys must switch evidence tabs');
+
+  assert.equal(app.readableReport('RP saw UNK SUSP. POE FD.'), 'Reporting person saw Unknown suspect. Entry point front door.');
+  const event = app.activityItem({ action: 'accept_step', subject: 'CC-26-000001', actor: 'det.demo', seq: 0, ts: 0, hash: 'abc', detail: { step: 'Review serial', recommendation: { step: 'Review serial', why: 'Evidence' } } });
+  assert.ok(event.textContent.includes('Accepted next step'));
+  assert.ok(event.textContent.includes('Review serial'));
+  assert.ok(!event.textContent.includes('recommendation'), 'Activity must not expose raw JSON field names');
+
   const pending = new Map();
   context.fetch = path => new Promise(resolve => pending.set(path, resolve));
   const data = id => ({ case: { id, status: { kind: 'open' }, block: '42XX BLOCK', neighborhood: 'FREMONT', beat: 'B2', narrative: 'Report' }, solvability: { score: 50, contributions: [] }, recorded: {}, pawn: [], similar: [], next_steps: [], victim_template: { message: 'Draft' } });
@@ -51,8 +65,14 @@ module.exports = (async () => {
   pending.get('/api/case/first')({ ok: true, json: async () => data('first') });
   await first;
   assert.equal(app.S.current.case.id, 'second', 'A late response must not replace the selected case');
+  assert.equal(elements.get('case-switcher').open, false, 'Selecting a case must close the switcher');
+  assert.equal(elements.get('selected-case-label').textContent, 'second');
 
   const step = { step: 'Review record', why: 'Serial lead', lawful_basis_note: 'Internal review', est_minutes: 10, source: 'triage' };
+  const disclosure = app.stepItem(step, 0, app.S.current);
+  const details = disclosure.children[0].children.find(n => n.tag === 'details');
+  assert.ok(details.textContent.includes(step.step), 'Full action wording must remain available inside Details');
+
   context.fetch = async () => ({ ok: false, status: 503, json: async () => ({ error: 'Unavailable' }) });
   const failed = app.stepItem(step, 0, app.S.current);
   await find(failed, 'Accept').onclick();

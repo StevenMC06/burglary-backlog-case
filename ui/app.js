@@ -86,8 +86,6 @@ function renderQueue() {
     ...cases.map((c) => {
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
         h("span", { class: "l1" }, c.id),
-        h("span", { class: "l2" }, human(c.block)),
-        h("span", { class: "l3" }, human(c.neighborhood)),
         (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
           c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
           c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
@@ -105,6 +103,7 @@ function renderQueue() {
 $("queue-search").oninput = () => { if (S.queue) renderQueue(); };
 function markCurrent() {
   document.querySelectorAll(".qbtn").forEach((b) => b.setAttribute("aria-current", String(b.dataset.id === S.current?.case.id)));
+  globalThis.CasefileMotion?.select(S.current?.case.id);
 }
 
 // ---------------------------------------------------------------- case card
@@ -135,34 +134,54 @@ function pawnCard(p) {
     h("details", { class: "step-details" }, h("summary", {}, "Match details"), h("p", {}, m.reason),
       st === "exact_serial_lead" ? h("p", {}, "Ownership unverified. Seller is not presumed to be the offender.") : null));
 }
+function readableReport(narrative) {
+  const terms = [[/\bRP\b/g, "Reporting person"], [/\bUNK SUSP\(s\)/gi, "Unknown suspect(s)"], [/\bUNK SUSP\b/gi, "Unknown suspect"], [/\bUNK\b/g, "unknown"], [/\bPOE\b/g, "Entry point"], [/\bFD\b/g, "front door"], [/\bRESD\b/g, "Residential"], [/\bSTOR UNIT B&E\b/g, "Storage unit break-in"], [/\brpt'd\b/g, "reported"], [/\bS\/N\b/g, "serial"], [/\bEst\./g, "Estimated"], [/\bSusp\b/g, "Suspect"], [/\bveh\b/g, "vehicle"], [/\bdk\b/g, "dark"]];
+  return terms.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), narrative);
+}
+function reportOverview(c) {
+  const readable = readableReport(c.narrative);
+  const lead = readable.match(/^[\s\S]*?[.!?](?:\s|$)/)?.[0]?.trim() || readable;
+  return h("div", { class: "report-overview" },
+    h("div", { class: "location-preview" },
+      h("div", { class: "globe-stage" },
+        h("canvas", { class: "globe-canvas", width: "800", height: "800", role: "img", tabindex: "0", "aria-label": "Dotted globe illustration. Drag or use arrow keys to rotate." }),
+        h("canvas", { class: "scene-canvas", width: "640", height: "320", "aria-hidden": "true" })),
+      h("div", { class: "preview-caption" }, h("span", {}, "Illustration · not evidence"), h("button", { type: "button", class: "globe-replay" }, "Replay zoom ↗"))),
+    h("p", { class: "report-lead" }, lead),
+    c.items?.length ? h("div", { class: "report-facts" }, h("span", { class: "kv" }, "Reported property"), c.items.map(item => h("span", { class: "property-tag" }, item.description || human(item.kind || "Item")))) : null,
+    h("details", { class: "report-original" }, h("summary", {}, "Read report"), h("p", { class: "narr" }, readable),
+      h("details", { class: "report-original" }, h("summary", {}, "Original wording"), h("p", { class: "narr" }, c.narrative))));
+}
+
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
   fill($("case-heading"),
     h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
     h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
-    h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`));
+    h("details", { class: "location-details" }, h("summary", {}, "Location"), h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)));
   fill(box, 
-    h("section", { class: "case-section" }, h("h2", {}, "Report"),
-      h("p", { class: "narr" }, c.narrative),
+    h("section", { class: "case-section", id: "evidence-report", role: "tabpanel", "aria-labelledby": "evidence-tab-report", tabindex: "0" },
+      reportOverview(c),
       h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
-    h("section", { class: "case-section" }, h("h2", {}, "Property"),
+    h("section", { class: "case-section", id: "evidence-property", role: "tabpanel", "aria-labelledby": "evidence-tab-property", tabindex: "0", hidden: true },
       d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
       d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
       d.pawn.some((p) => p.match.status === "rejected_conflicting_serial") ?
         h("details", { class: "disclosure" }, h("summary", {}, `${d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").length} excluded records`),
           d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").map(pawnCard)) : null),
-    h("section", { class: "case-section" }, h("h2", {}, "Related cases"),
+    h("section", { class: "case-section", id: "evidence-related", role: "tabpanel", "aria-labelledby": "evidence-tab-related", tabindex: "0", hidden: true },
     d.similar.length ? d.similar.map((x) => {
       const o = x.other, p = x.pair;
       return h("div", { class: "linked" },
-        h("span", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(o.id) }, o.id), h("span", { class: "kv" }, human(o.neighborhood))),
+        h("span", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(o.id) }, o.id), h("details", { class: "location-details" }, h("summary", {}, "Location"), h("span", { class: "kv" }, human(o.neighborhood)))),
         h("span", { class: "kv", title: `Similarity ${p.score.toFixed(2)}; ${p.components.shared_signatures} shared signatures` }, `${p.components.distance_km.toFixed(1)} km · ${p.components.days_apart.toFixed(0)} d`));
     }) : h("p", { class: "empty" }, "No related cases.")),
     h("details", { class: "disclosure" }, h("summary", {}, "Review factors"),
       h("div", { class: "score-line" }, h("b", {}, s.score.toFixed(0) + " / 100"), h("span", { class: "kv" }, "Solvability score")), bars(s.contributions),
       h("p", { class: "kv" }, `Reported ${fmtTime(c.reported_at)} · Extraction ${d.recorded.extractor ? "recorded" : "unavailable"}`))
   );
+  showEvidence("report");
 }
 
 // ---------------------------------------------------------------- right: packet + steps
@@ -199,7 +218,7 @@ function stepItem(st, i, d) {
   const li = h("li", { class: "step " + (done ? done.kind : "") });
   const body = h("div", {}, h("div", { class: "step-title" }, st.step),
     h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
-      h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
+      h("p", { class: "full-step" }, st.step), h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
   li.append(body);
   const btns = h("div", { class: "btns" });
   if (done) {
@@ -236,7 +255,9 @@ function renderPacket() {
   fill(pane, 
     h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
     tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
-    h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d))),
+    h("ul", { class: "steps featured-step" }, d.next_steps.slice(0, 1).map((s, i) => stepItem(s, i, d))),
+    d.next_steps.length > 1 ? h("details", { class: "more-actions" }, h("summary", {}, `${d.next_steps.length - 1} more actions`),
+      h("ul", { class: "steps remaining-steps" }, d.next_steps.slice(1).map((s, i) => stepItem(s, i + 1, d)))) : null,
     h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
     pk ? [h("div", { class: "row-flex" }, pk.output.citations_ok ? null : h("span", { class: "chip weak" }, "Citations need review"),
         h("span", { class: "kv" }, `${pk.model} · $${pk.cost_usd.toFixed(3)} · ${(pk.duration_ms / 1000).toFixed(0)}s`),
@@ -362,6 +383,19 @@ function renderVictim() {
 }
 
 // ---------------------------------------------------------------- drawers
+function activityItem(e) {
+  const labels = { accept_step: "Accepted next step", reject_step: "Rejected next step", approve_series_alert: "Approved series alert", approve_victim_update: "Approved victim update", request_approval: "Requested approval" };
+  const d = e.detail || {};
+  const title = labels[e.action] || human(e.action.replace(/_/g, " "));
+  return h("li", { class: "activity-entry" },
+    h("div", { class: "activity-title" }, h("b", {}, title), h("span", { class: "kv" }, e.subject)),
+    d.step || d.recommendation?.step ? h("p", { class: "activity-description" }, d.step || d.recommendation.step) : null,
+    d.reason ? h("p", { class: "kv" }, "Reason: " + d.reason) : null,
+    d.note ? h("p", { class: "kv" }, d.note) : null,
+    h("div", { class: "kv" }, fmtTime(Number(e.ts)) + " · " + (e.actor === "det.demo" ? "Demo detective" : e.actor)),
+    h("details", { class: "activity-verification" }, h("summary", {}, "Verification"),
+      h("p", { class: "kv" }, "Entry #" + auditNumber(e.seq)), h("p", { class: "mono" }, "Hash: " + e.hash)));
+}
 async function loadAudit() {
   const a = await api("/api/audit");
   const ok = a.chain.intact;
@@ -371,8 +405,7 @@ async function loadAudit() {
   chip.title = ok ? "Audit chain intact" : `Audit chain broken at #${auditNumber(a.chain.first_bad_seq)}`;
   $("audit-status").textContent = ok ? `Chain intact ✓ (${a.chain.entries} entries)` : `Chain broken at entry #${auditNumber(a.chain.first_bad_seq)}`;
   $("audit-status").className = "status " + (ok ? "ok" : "bad");
-  $("audit-list").replaceChildren(...[...a.entries].reverse().map((e) => h("li", {},
-    h("b", {}, e.action), ` on ${e.subject} by ${e.actor}`, h("div", { class: "kv" }, `#${auditNumber(e.seq)} · ${fmtTime(Number(e.ts))} · `, h("span", { class: "mono" }, e.hash.slice(0, 12)), " · ", JSON.stringify(e.detail)))));
+  $("audit-list").replaceChildren(...[...a.entries].reverse().map(activityItem));
   if (!a.entries.length) $("audit-list").replaceChildren(h("li", { class: "empty" }, "No decisions yet."));
 }
 function renderTeam() {
@@ -401,6 +434,26 @@ $("btn-team").onclick = () => openDrawer("drawer-team");
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".drawer").forEach((d) => (d.hidden = true)); });
 
 // ---------------------------------------------------------------- tabs
+const EVIDENCE_TABS = ["report", "property", "related"];
+function showEvidence(name) {
+  EVIDENCE_TABS.forEach(t => {
+    const on = t === name;
+    $("evidence-tab-" + t).setAttribute("aria-selected", String(on));
+    $("evidence-tab-" + t).tabIndex = on ? 0 : -1;
+    $("evidence-" + t).hidden = !on;
+  });
+}
+EVIDENCE_TABS.forEach((t, i) => {
+  $("evidence-tab-" + t).onclick = () => showEvidence(t);
+  $("evidence-tab-" + t).onkeydown = e => {
+    const n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? 2 : null;
+    if (n == null) return;
+    e.preventDefault();
+    const target = EVIDENCE_TABS[(n + EVIDENCE_TABS.length) % EVIDENCE_TABS.length];
+    showEvidence(target); $("evidence-tab-" + target).focus();
+  };
+});
+
 const TABS = ["packet", "series", "victim"];
 function showTab(name) {
   TABS.forEach((t) => {
@@ -430,6 +483,8 @@ async function selectCase(id) {
     S.current = data;
   } catch (e) { if (request === selection) toast(e.message); return; }
   S.seriesPick = null;
+  $("selected-case-label").textContent = id;
+  $("case-switcher").open = false;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
   $("case-card").scrollTop = 0;
   document.querySelectorAll(".pane").forEach((p) => { p.scrollTop = 0; });
