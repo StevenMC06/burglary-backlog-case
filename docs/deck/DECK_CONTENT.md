@@ -1,4 +1,6 @@
-# Deck content v1 (9 slides, 7:00 incl. 75 s demo) — source of truth for the Slides artifact
+> Content correction: use docs/review/SLIDE_CONTENT_HANDOFF.md and executable cost output. This historical outline includes superseded claims and is not the current numerical source of truth.
+
+# Historical deck outline v1 (9 slides, 7:00 incl. 75 s demo) — source of truth for the Slides artifact
 
 Numbers: `cargo run -- cost` (official baseline) and `cargo run -- eval` (synthetic ground truth). {EVAL_*} = filled after evals run.
 Rubric map: Impact 30 (S2, S6, S7) · Feasibility 25 (S3, S5, S8) · Cost-effectiveness 20 (S6) · Ethics 15 (S9) · Presentation 10 · Bonus: prototype (S4), AI beyond obvious automation (S5 verifier), creativity (S1/S5), community (S3 victim updates + property returned), honest claims (S6/S7 shortfall shown).

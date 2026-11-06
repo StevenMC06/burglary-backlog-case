@@ -470,6 +470,18 @@ pub struct DecisionIn {
     detail: Value,
 }
 
+/// Match the exact recommendation shown by the console; ambiguous duplicates fail closed.
+fn canonical_step(steps: &[Value], detail: &Value) -> Result<Value, String> {
+    let text = detail["step"].as_str().filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| "proposed step required".to_string())?;
+    let source = detail["source"].as_str().filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| "step source required".to_string())?;
+    let mut matches = steps.iter().filter(|s| s["step"] == text && s["source"] == source);
+    let step = matches.next().ok_or_else(|| "step/source does not match a current recommendation".to_string())?;
+    if matches.next().is_some() { return Err("ambiguous recommendation".into()); }
+    Ok(step.clone())
+}
+
 /// Validate against server-owned records, never the caller's supplied verdict.
 fn validate_decision(app: &App, d: &mut DecisionIn) -> Result<(), String> {
     match d.action.as_str() {
@@ -488,6 +500,12 @@ fn validate_decision(app: &App, d: &mut DecisionIn) -> Result<(), String> {
         "accept_step" | "reject_step" | "approve_victim_update" => {
             if find_case(&app.store.ds, &d.subject).is_none() {
                 return Err("unknown case subject".into());
+            }
+            if d.action == "accept_step" || d.action == "reject_step" {
+                let case = build_case(app, &d.subject).ok_or_else(|| "unknown case subject".to_string())?;
+                let steps = case["next_steps"].as_array().ok_or_else(|| "recommendations unavailable".to_string())?;
+                let matched = canonical_step(steps, &d.detail)?;
+                d.detail["recommendation"] = matched;
             }
             if d.action == "reject_step" {
                 let reason = d.detail["reason"].as_str().unwrap_or("");
@@ -653,6 +671,16 @@ mod tests {
         })
     }
 
+    #[test]
+    fn step_match_rejects_missing_or_duplicate_recommendations() {
+        let step = json!({"step":"Review source", "source":"engine", "why":"evidence"});
+        let detail = json!({"step":"Review source", "source":"engine"});
+        assert_eq!(canonical_step(std::slice::from_ref(&step), &detail).unwrap(), step);
+        assert!(canonical_step(&[step.clone(), step], &detail).is_err());
+        assert!(canonical_step(&[], &detail).is_err());
+        assert!(canonical_step(&[], &json!({"step":"Review source"})).is_err());
+    }
+
     #[tokio::test]
     async fn backend_decisions_reject_bypass_without_append() {
         let root = repo_root();
@@ -663,27 +691,43 @@ mod tests {
         let decision = |action: &str, subject: &str, detail: Value| DecisionIn {
             actor: "det.demo".into(), action: action.into(), subject: subject.into(), detail,
         };
+        let case = build_case(&a, &case_id).unwrap();
+        let step = case["next_steps"][0].clone();
+        let detail = |extra: Value| {
+            let mut result = extra;
+            result["step"] = step["step"].clone();
+            result["source"] = step["source"].clone();
+            result
+        };
         for d in [
+            decision("accept_step", &case_id, json!({})),
+            decision("accept_step", &case_id, json!({"step":"invented", "source":"engine"})),
+            decision("accept_step", &case_id, json!({"step":step["step"], "source":"wrong"})),
             decision("approve_series_alert", "H-DECOY", json!({"verdict":"pass", "case_ids":[]})),
             decision("approve_series_alert", "NO-SERIES", json!({})),
             decision("accept_step", "NO-CASE", json!({})),
             decision("made_up", &case_id, json!({})),
             decision("reject_step", &case_id, json!({})),
-            decision("reject_step", &case_id, json!({"reason":"invalid"})),
-            decision("reject_step", &case_id, json!({"reason":"Other", "note":"  "})),
+            decision("reject_step", &case_id, detail(json!({"reason":"invalid"}))),
+            decision("reject_step", &case_id, detail(json!({"reason":"Other", "note":"  "}))),
         ] {
+            let bytes = std::fs::read(dir.join("data/audit.jsonl")).ok();
             let failure = h_decision(State(a.clone()), Json(d)).await.unwrap_err();
             assert_eq!(failure.0, StatusCode::BAD_REQUEST);
             assert_eq!(a.audit.verify(), Ok(0));
+            assert_eq!(std::fs::read(dir.join("data/audit.jsonl")).ok(), bytes);
         }
         for (index, d) in [
-            decision("accept_step", &case_id, json!({})),
-            decision("reject_step", &case_id, json!({"reason":"Not lawful"})),
-            decision("reject_step", &case_id, json!({"reason":"Other", "note":"source unavailable"})),
+            decision("accept_step", &case_id, detail(json!({"recommendation":"forged"}))),
+            decision("reject_step", &case_id, detail(json!({"reason":"Not lawful"}))),
+            decision("reject_step", &case_id, detail(json!({"reason":"Other", "note":"source unavailable"}))),
             decision("approve_victim_update", &case_id, json!({})),
         ].into_iter().enumerate() {
             assert!(h_decision(State(a.clone()), Json(d)).await.is_ok());
             assert_eq!(a.audit.verify(), Ok(index + 1));
+            if index < 3 {
+                assert_eq!(a.audit.try_entries().unwrap().last().unwrap().detail["recommendation"], step);
+            }
         }
         let series = build_series(&a);
         let valid = series["series"].as_array().unwrap().iter().find(|row| row["verify"]["verdict"] != "fail").unwrap();

@@ -27,4 +27,4 @@ Two independent reviewers inspected approval handling and audit/MCP integration.
 
 Verified: cargo build --offline; cargo test --offline --quiet (41 binary +49 core tests); cargo clippy --offline --all-targets -- -D warnings; python3 tools/review/check_safeguards.py (isolated real HTTP server, synthetic data); git diff --check.
 
-Remaining detail limitation: case-level decisions require an existing case but do not yet bind step text to a specific versioned recommendation. No production authentication, immutable storage, or cross-process transaction guarantee is claimed.
+Step decisions now require an exact current step/source match and preserve the canonical recommendation snapshot. Duplicate matches fail closed. The API does not yet use versioned recommendation IDs. No production authentication, immutable storage, or cross-process transaction guarantee is claimed.

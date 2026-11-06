@@ -45,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix='casefile-http-') as tmp:
         else:
             raise RuntimeError('server startup timeout')
         case = queue['cases'][0]['id']
+        step = request('case/' + case)[1]['next_steps'][0]
+        real_detail = {'step': step['step'], 'source': step['source']}
         def decision(action, subject, detail):
             return {'actor': 'det.demo', 'action': action, 'subject': subject, 'detail': detail}
         for payload in [decision('approve_series_alert', 'H-DECOY', {'verdict': 'pass'}),
@@ -54,13 +56,14 @@ with tempfile.TemporaryDirectory(prefix='casefile-http-') as tmp:
                         decision('reject_step', case, {'reason': 'Other', 'note': ' '})]:
             assert request('decision', payload)[0] == 400
             assert request('audit')[1]['chain']['entries'] == 0
-        assert request('decision', decision('reject_step', case, {'reason': 'Not lawful'}))[0] == 200
+        assert request('decision', decision('reject_step', case, dict(real_detail, reason='Not lawful')))[0] == 200
+        assert request('audit')[1]['entries'][0]['detail']['recommendation'] == step
         assert request('audit')[1]['chain'] == {'intact': True, 'entries': 1}
         audit = root / 'data/audit.jsonl'
         audit.write_text(audit.read_text() + 'BROKEN\n')
         before = audit.read_bytes()
         assert request('audit')[1]['chain']['intact'] is False
-        assert request('decision', decision('accept_step', case, {}))[0] == 400
+        assert request('decision', decision('accept_step', case, real_detail))[0] == 400
         assert audit.read_bytes() == before
         print('PASS: HTTP bypasses rejected; valid decision recorded; corrupt audit blocks writes unchanged.')
     finally:
