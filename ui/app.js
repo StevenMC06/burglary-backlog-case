@@ -6,6 +6,9 @@ const ACTOR = "det.demo";
 const REASONS = ["Not lawful", "Not available", "Too resource-intensive", "Other"];
 const $ = (id) => document.getElementById(id);
 
+// Stored audit sequences remain zero-based; display ordinals start at one.
+function auditNumber(seq) { return Number.isSafeInteger(seq) && seq >= 0 ? seq + 1 : "unknown"; }
+
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -187,7 +190,7 @@ async function decide(action, subject, detail) {
   const r = await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ actor: ACTOR, action, subject, detail }) });
   await loadAudit().catch(() => toast("Decision saved. Activity could not refresh."));
-  toast(`Decision saved · #${r.entry.seq}`);
+  toast(`Decision saved · #${auditNumber(r.entry.seq)}`);
   return r;
 }
 function stepItem(st, i, d) {
@@ -365,11 +368,11 @@ async function loadAudit() {
   const chip = $("audit-chip");
   chip.className = "activity-count";
   chip.textContent = ok ? a.chain.entries : "!";
-  chip.title = ok ? "Audit chain intact" : `Audit chain broken at #${a.chain.first_bad_seq}`;
-  $("audit-status").textContent = ok ? `Chain intact ✓ (${a.chain.entries} entries)` : `Chain broken at entry #${a.chain.first_bad_seq}`;
+  chip.title = ok ? "Audit chain intact" : `Audit chain broken at #${auditNumber(a.chain.first_bad_seq)}`;
+  $("audit-status").textContent = ok ? `Chain intact ✓ (${a.chain.entries} entries)` : `Chain broken at entry #${auditNumber(a.chain.first_bad_seq)}`;
   $("audit-status").className = "status " + (ok ? "ok" : "bad");
   $("audit-list").replaceChildren(...[...a.entries].reverse().map((e) => h("li", {},
-    h("b", {}, e.action), ` on ${e.subject} by ${e.actor}`, h("div", { class: "kv" }, `#${e.seq} · ${fmtTime(Number(e.ts))} · `, h("span", { class: "mono" }, e.hash.slice(0, 12)), " · ", JSON.stringify(e.detail)))));
+    h("b", {}, e.action), ` on ${e.subject} by ${e.actor}`, h("div", { class: "kv" }, `#${auditNumber(e.seq)} · ${fmtTime(Number(e.ts))} · `, h("span", { class: "mono" }, e.hash.slice(0, 12)), " · ", JSON.stringify(e.detail)))));
   if (!a.entries.length) $("audit-list").replaceChildren(h("li", { class: "empty" }, "No decisions yet."));
 }
 function renderTeam() {
