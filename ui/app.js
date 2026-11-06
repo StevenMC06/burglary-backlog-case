@@ -39,7 +39,15 @@ async function api(path, opts) {
 const fmtTime = (s) => (s == null ? "" : new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") + "Z");
 const pct = (x) => (x * 100).toFixed(1) + "%";
 const shortId = (id) => id.replace(/^CC-/, "");
-const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX");
+const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX")
+  .replace(/\b(Nw|Ne|Sw|Se|Slu|Id)\b/g, (w) => w.toUpperCase());
+const prov = (kind, label) => h("span", { class: "prov " + kind }, label);
+const BAND = { strong: "pass", moderate: "weak", weak: "fail" };
+const bandLabel = (b) => (b ? b[0].toUpperCase() + b.slice(1) : "");
+function meter(score, band) {
+  return h("span", { class: "meter " + (BAND[band] || ""), role: "img", "aria-label": `Solvability ${Math.round(score)} of 100, ${band}` },
+    h("i", { style: `width:${Math.max(2, Math.min(100, score)).toFixed(0)}%` }));
+}
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -84,13 +92,16 @@ function renderQueue() {
   const ul = $("queue-list");
   ul.replaceChildren(
     ...cases.map((c) => {
+      const sv = c.solvability;
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
-        h("span", { class: "l1" }, c.id),
+        h("span", { class: "l1" }, h("span", { class: "qid" }, c.id),
+          sv ? h("span", { class: "qscore", title: `Solvability ${sv.score.toFixed(0)}/100 · ${sv.band}` }, sv.score.toFixed(0)) : null),
+        sv ? meter(sv.score, sv.band) : null,
         h("span", { class: "l2" }, human(c.block)),
         h("span", { class: "l3" }, human(c.neighborhood)),
         (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
-          c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
-          c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
+          c.flags.pawn_hit === "exact_serial_lead" ? h("span", { class: "flag lead" }, "Serial lead") : null,
+          c.flags.series_id ? h("span", { class: "flag series" }, "Possible series") : null) : null);
       return h("li", {}, btn);
     })
   );
@@ -138,15 +149,31 @@ function pawnCard(p) {
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
+  const lead = d.pawn.find((p) => p.match.status === "exact_serial_lead");
+  const winH = c.window_end != null && c.window_start != null ? (c.window_end - c.window_start) / 3600 : null;
   fill($("case-heading"),
-    h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
-    h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
-    h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`));
+    h("div", { class: "heading-main" },
+      h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
+      h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
+      h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
+    h("dl", { class: "summary" },
+      h("div", { class: "sum score " + (BAND[s.band] || "") },
+        h("dt", {}, "Solvability"),
+        h("dd", {}, h("b", {}, s.score.toFixed(0)), h("span", { class: "of" }, "/100 "), h("span", { class: "band" }, bandLabel(s.band)))),
+      h("div", { class: "sum" + (lead ? " good" : "") },
+        h("dt", {}, "Property"),
+        h("dd", {}, lead ? h("span", { class: "mono" }, lead.match.pawn_id) : "No serial lead")),
+      h("div", { class: "sum" + (d.series_id ? " good" : "") },
+        h("dt", {}, "Series"),
+        h("dd", {}, d.series_id || "Not linked")),
+      winH != null ? h("div", { class: "sum" },
+        h("dt", {}, "Offense window"),
+        h("dd", {}, `${winH.toFixed(0)} h`)) : null));
   fill(box, 
-    h("section", { class: "case-section" }, h("h2", {}, "Report"),
+    h("section", { class: "case-section" }, h("div", { class: "section-head" }, h("h2", {}, "Report"), prov("src", "Source record")),
       h("p", { class: "narr" }, c.narrative),
       h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
-    h("section", { class: "case-section" }, h("h2", {}, "Property"),
+    h("section", { class: "case-section" }, h("div", { class: "section-head" }, h("h2", {}, "Property"), prov("rule", "Rules engine")),
       d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
       d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
       d.pawn.some((p) => p.match.status === "rejected_conflicting_serial") ?
@@ -198,7 +225,8 @@ function stepItem(st, i, d) {
   const done = S.decided[key];
   const li = h("li", { class: "step " + (done ? done.kind : "") });
   const body = h("div", {}, h("div", { class: "step-title" }, st.step),
-    h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
+    h("div", { class: "step-meta" }, st.source === "engine" ? prov("rule", "Rules engine") : prov("ai", "AI suggested · " + st.source), h("span", {}, `~${st.est_minutes} min`)),
+    h("details", { class: "step-details" }, h("summary", {}, "Why this step"),
       h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
   li.append(body);
   const btns = h("div", { class: "btns" });
@@ -234,7 +262,7 @@ function renderPacket() {
   const d = S.current, pane = $("pane-packet");
   const pk = d.recorded.packet_writer, tr = d.recorded.triage;
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions · you decide each one`)),
     tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
     h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d))),
     h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
@@ -297,7 +325,7 @@ function timelineSvg(ser) {
     const w = Math.max(3, x(c.window_end) - x(c.window_start));
     el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#1d4f91" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
     if (ser.in_queue.includes(c.id) || ser.cleared?.case_id === c.id)
-      el.append(svg("text", { x: Math.min(x(c.window_start), W - 40), y: 14 }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
+      el.append(svg("text", { x: Math.min(Math.max(x(c.window_start), P), W - P), y: 14, "text-anchor": x(c.window_start) > W - 80 ? "end" : "start" }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
   });
   el.append(svg("text", { x: P, y: H - 3 }, fmtTime(t0)), svg("text", { x: W - P, y: H - 3, "text-anchor": "end" }, fmtTime(t1)));
   return el;
@@ -322,13 +350,13 @@ function renderSeries() {
     } catch (e) { toast(e.message); approve.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "row-flex" }, sel),
+    h("div", { class: "section-head" }, sel, prov("rule", "Rules engine")),
     h("div", { class: "kv" }, ser.rationale),
     ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
     mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
     h("h3", {}, "Link checks"),
     h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
-    h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
+    h("details", { class: "disclosure" }, h("summary", {}, "Independent review (AI skeptic)"),
       ser.skeptic && sk ? h("p", { class: "kv" }, sk.reasons_with_citations) : missing("the independent review")),
     h("div", { class: "row-flex" }, approve),
     v.verdict === "fail" ? h("p", { class: "kv" }, "Approval blocked by failed link checks.") : null
@@ -352,9 +380,9 @@ function renderVictim() {
     } catch (e) { toast(e.message); btn.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Victim update"), h("span", {}, `Draft · ${lang.toUpperCase()}`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Victim update"), rec ? prov("ai", `AI draft · ${lang.toUpperCase()}`) : prov("rule", `Template · ${lang.toUpperCase()}`)),
     rec ? null : h("p", { class: "kv" }, "Standard template · No recorded draft"),
-    h("div", { class: "packet-text", lang: lang }, msg),
+    h("div", { class: "packet-text draft", lang: lang }, msg),
     rec?.output.plain_english_summary ? h("div", { class: "kv" }, "English summary: " + rec.output.plain_english_summary) : null,
     h("div", { class: "kv" }, "Approval is recorded. Delivery is not connected."),
     h("div", { class: "row-flex" }, btn)
