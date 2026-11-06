@@ -1,0 +1,5 @@
+{
+  "model": "sonnet",
+  "allowed_tools": ["propose_clusters", "similar_cases", "verify_series", "get_case"],
+  "input": "case_id"
+}

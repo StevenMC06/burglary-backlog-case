@@ -1,0 +1,5 @@
+{
+  "model": "opus",
+  "allowed_tools": ["verify_series", "get_case", "similar_cases"],
+  "input": "recording:series_hunter"
+}

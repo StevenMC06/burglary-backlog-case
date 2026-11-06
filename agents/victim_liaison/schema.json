@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["language", "message", "plain_english_summary"],
+  "properties": {
+    "language": {"type": "string"},
+    "message": {"type": "string"},
+    "plain_english_summary": {"type": "string"}
+  }
+}

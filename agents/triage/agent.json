@@ -1,0 +1,5 @@
+{
+  "model": "sonnet",
+  "allowed_tools": ["score_solvability", "similar_cases", "pawn_lookup", "get_case"],
+  "input": "case_id"
+}

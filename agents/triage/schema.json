@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["disposition", "rationale_with_citations", "next_steps"],
+  "properties": {
+    "disposition": {"type": "string", "enum": ["assign", "screen_out", "link_review"]},
+    "rationale_with_citations": {"type": "string"},
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "why", "lawful_basis_note", "est_minutes"],
+        "properties": {
+          "step": {"type": "string"},
+          "why": {"type": "string"},
+          "lawful_basis_note": {"type": "string"},
+          "est_minutes": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}

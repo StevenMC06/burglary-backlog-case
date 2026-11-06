@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["packet_markdown", "citations_ok"],
+  "properties": {
+    "packet_markdown": {"type": "string"},
+    "citations_ok": {"type": "boolean"}
+  }
+}
