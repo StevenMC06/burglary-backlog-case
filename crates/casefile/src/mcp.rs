@@ -505,10 +505,10 @@ impl CasefileServer {
             None => None,
         };
         let status = p.status.as_deref().map(|s| s.trim().to_lowercase());
-        if let Some(s) = &status {
-            if !["open", "suspended", "cleared", "cleared_by_arrest"].contains(&s.as_str()) {
-                return Err(format!("status must be open, suspended or cleared, got '{s}'"));
-            }
+        if let Some(s) = &status
+            && !["open", "suspended", "cleared", "cleared_by_arrest"].contains(&s.as_str())
+        {
+            return Err(format!("status must be open, suspended or cleared, got '{s}'"));
         }
         let premise = p.premise.as_deref().map(|s| s.trim().to_lowercase());
         let hood = p.neighborhood.as_deref().map(|s| s.trim().to_lowercase());
@@ -606,7 +606,7 @@ impl CasefileServer {
     async fn score_solvability(&self, Parameters(p): Parameters<CaseIdParams>) -> Result<String, String> {
         let c = self.need_case(&p.case_id)?;
         let clusters = self.clusters(DEFAULT_CLUSTER_THRESHOLD)?;
-        let linked = clusters.iter().any(|h| h.case_ids.iter().any(|i| *i == c.id));
+        let linked = clusters.iter().any(|h| h.case_ids.contains(&c.id));
         let matches = guard("pawn matching", || property::match_case(self.ds(), &c.id))?;
         let hit = matches.iter().any(|m| m.status == MatchStatus::ExactSerialLead);
         let ctx = solvability::Context { linked_to_series: linked, property_hit: hit };
