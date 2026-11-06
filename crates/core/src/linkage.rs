@@ -193,6 +193,7 @@ fn jaccard<T>(a: &[T], b: &[T], eq: impl Fn(&T, &T) -> bool + Copy) -> f64 {
     }
 }
 
+#[allow(clippy::ptr_arg)] // must match the `Fn(&T, &T)` bound with T = String
 fn sig_eq(a: &String, b: &String) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
 }
