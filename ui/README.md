@@ -1,12 +1,10 @@
 # UI preview branch
 
-This branch contains the glass case-review layout, compact case switcher, evidence tabs, readable activity, and COBE globe transition. The illustrations are not case evidence.
+The console combines the glass case-review layout and COBE globe transition with a compact desktop inbox, score meters, four-cell case summary, and source-report/property overview. The illustrations are not case evidence. Below 1180px, Cases opens the inbox as a disclosure; selecting a case closes it. Desktop selection keeps the inbox visible.
 
 ## Preview
 
 ```sh
-git fetch origin
-git switch --track origin/steven/calm-casefile-ui
 cargo run -- serve --port 8081
 ```
 

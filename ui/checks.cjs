@@ -25,17 +25,21 @@ const context = vm.createContext({ document, setTimeout() {}, clearTimeout() {} 
 const script = fs.readFileSync(__dirname + '/app.js', 'utf8');
 assert.match(script, /\nmain\(\);\s*$/);
 vm.runInContext(script.replace(/\nmain\(\);\s*$/, ''), context);
-const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem, showEvidence, activityItem, readableReport, pendingSteps, renderPacket, renderVictim })', context);
+const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem, showEvidence, activityItem, readableReport, pendingSteps, renderPacket, renderVictim, renderCase })', context);
 function find(node, text) {
   if (node.tag === 'button' && node.textContent === text) return node;
   for (const child of node.children || []) { const result = find(child, text); if (result) return result; }
 }
 
 module.exports = (async () => {
-  app.S.queue = { cases: [{ id: 'CC-26-000001', neighborhood: 'FREMONT', block: '42XX BLOCK', flags: {} }] };
+  app.S.queue = { cases: [{ id: 'CC-26-000001', neighborhood: 'FREMONT', block: '42XX BLOCK', flags: {}, solvability: { score: 78, band: 'strong' } }] };
   document.getElementById('queue-search').value = 'fReMoNt';
   app.renderQueue();
   assert.equal(elements.get('queue-list').children.length, 1);
+  assert.ok(elements.get('queue-list').textContent.includes('42XX Block'), 'Inbox must show location without opening a case');
+  const meter = elements.get('queue-list').children[0].children[0].children.find(n => n.className === 'queue-meter strong');
+  assert.equal(meter.children[0].attrs.style, 'width:78%', 'Meter must use the engine score');
+  assert.equal(meter.attrs['aria-label'], 'Solvability 78 out of 100');
   document.getElementById('queue-search').value = 'no such case';
   app.renderQueue();
   assert.equal(elements.get('queue-list').children.length, 0);
@@ -86,6 +90,19 @@ module.exports = (async () => {
   assert.equal(app.S.current.case.id, 'second', 'A late response must not replace the selected case');
   assert.equal(elements.get('case-switcher').open, false, 'Selecting a case must close the switcher');
   assert.equal(elements.get('selected-case-label').textContent, 'second');
+  assert.ok(elements.get('case-heading').textContent.includes('Not linked'));
+  assert.ok(elements.get('case-heading').textContent.includes('Not recorded'), 'Unknown offense window must not show zero hours');
+  const overview = () => elements.get('case-card').children.find(n => n.attrs.id === 'evidence-report');
+  assert.ok(overview().textContent.includes('Source record'));
+  assert.ok(overview().textContent.includes('Property'), 'Overview must show report and property together');
+
+  app.S.current.case.window_start = 0;
+  app.S.current.case.window_end = 1800;
+  app.S.current.pawn = [{ match: { status: 'exact_serial_lead', pawn_id: 'PW-1', days_after_offense: 3, reason: 'Serial match' }, item: { description: 'Synthetic laptop', serial: 'ABC' }, pawn: { serial: 'ABC', dealer: 'Demo dealer' } }];
+  app.renderCase();
+  assert.ok(elements.get('case-heading').textContent.includes('0.5 h'), 'Short windows must not round to zero');
+  assert.ok(elements.get('case-heading').textContent.includes('PW-1'));
+  assert.ok(overview().textContent.includes('Exact serial lead'));
 
   app.S.current.recorded.victim_liaison = { output: { language: 'es', message: 'Estimado residente' } };
   app.S.current.victim_template = { language: 'en', message: 'Your report has been received.' };
@@ -132,5 +149,16 @@ module.exports = (async () => {
   app.renderPacket();
   assert.equal(featured(), undefined);
   assert.ok(elements.get('pane-packet').textContent.includes('All actions reviewed'));
+
+  const media = { matches: true, addEventListener(event, fn) { this.onchange = fn; } };
+  const desktopContext = vm.createContext({ document, setTimeout() {}, clearTimeout() {}, matchMedia: () => media });
+  vm.runInContext(script.replace(/\nmain\(\);\s*$/, ''), desktopContext);
+  desktopContext.fetch = async () => ({ ok: true, json: async () => data('desktop') });
+  await vm.runInContext("selectCase('desktop')", desktopContext);
+  assert.equal(elements.get('case-switcher').open, true, 'Desktop selection must keep the inbox visible');
+  media.onchange({ matches: false });
+  assert.equal(elements.get('case-switcher').open, false, 'A narrow viewport must collapse the inbox');
+  media.onchange({ matches: true });
+  assert.equal(elements.get('case-switcher').open, true, 'Returning to desktop must restore the inbox');
   console.log('UI checks passed: search, empty results, selection race, failed decisions, retry.');
 })();

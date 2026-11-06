@@ -39,7 +39,8 @@ async function api(path, opts) {
 const fmtTime = (s) => (s == null ? "" : new Date(s * 1000).toISOString().slice(5, 16).replace("T", " ") + "Z");
 const pct = (x) => (x * 100).toFixed(1) + "%";
 const shortId = (id) => id.replace(/^CC-/, "");
-const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX");
+const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX")
+  .replace(/\b(Nw|Ne|Sw|Se|Slu|Id)\b/g, (w) => w.toUpperCase());
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -53,6 +54,8 @@ function fill(el, ...kids) {
 }
 
 const S = { queue: null, current: null, series: null, kpi: null, team: null, seriesPick: null, queueFilter: "all", decided: {} };
+const wideInbox = typeof matchMedia === "function" ? matchMedia("(min-width: 1180px)") : null;
+wideInbox?.addEventListener("change", e => { $("case-switcher").open = e.matches; });
 
 // ---------------------------------------------------------------- KPI strip
 function renderKpi() {
@@ -86,8 +89,14 @@ function renderQueue() {
   const ul = $("queue-list");
   ul.replaceChildren(
     ...cases.map((c) => {
+      const sv = c.solvability;
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
-        h("span", { class: "l1" }, c.id),
+        h("span", { class: "l1" }, h("span", { class: "qid" }, c.id),
+          sv ? h("span", { class: "qscore", title: `Solvability ${sv.score.toFixed(0)}/100 · ${sv.band}` }, sv.score.toFixed(0)) : null),
+        sv ? h("span", { class: "queue-meter " + sv.band, role: "img", "aria-label": `Solvability ${sv.score.toFixed(0)} out of 100` },
+          h("i", { style: `width:${Math.max(0, Math.min(100, sv.score))}%` })) : null,
+        h("span", { class: "l2" }, human(c.block)),
+        h("span", { class: "l3" }, human(c.neighborhood)),
         (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
           c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
           c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
@@ -144,37 +153,52 @@ function readableReport(narrative) {
   return terms.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), narrative);
 }
 function reportOverview(c) {
-  const readable = readableReport(c.narrative);
-  const lead = readable.match(/^[\s\S]*?[.!?](?:\s|$)/)?.[0]?.trim() || readable;
   return h("div", { class: "report-overview" },
     h("div", { class: "location-preview" },
       h("div", { class: "globe-stage" },
         h("canvas", { class: "globe-canvas", width: "800", height: "800", role: "img", tabindex: "0", "aria-label": "Dotted globe illustration. Drag or use arrow keys to rotate." }),
         h("canvas", { class: "scene-canvas", width: "640", height: "320", "aria-hidden": "true" })),
       h("div", { class: "preview-caption" }, h("span", {}, "Illustration · not evidence"), h("button", { type: "button", class: "globe-replay" }, "Replay zoom ↗"))),
-    h("p", { class: "report-lead" }, lead),
-    c.items?.length ? h("div", { class: "report-facts" }, h("span", { class: "kv" }, "Reported property"), c.items.map(item => h("span", { class: "property-tag" }, item.description || human(item.kind || "Item")))) : null,
-    h("details", { class: "report-original" }, h("summary", {}, "Read report"), h("p", { class: "narr" }, readable),
-      h("details", { class: "report-original" }, h("summary", {}, "Original wording"), h("p", { class: "narr" }, c.narrative))));
+    h("div", { class: "section-head" }, h("h2", {}, "Report"), h("span", { class: "provenance source" }, "Source record")),
+    h("p", { class: "narr source-record" }, c.narrative),
+    h("details", { class: "report-original" }, h("summary", {}, "Plain-English wording"), h("p", { class: "narr" }, readableReport(c.narrative))));
+}
+
+function propertyContents(d) {
+  const visible = d.pawn.filter(p => p.match.status !== "rejected_conflicting_serial");
+  const excluded = d.pawn.filter(p => p.match.status === "rejected_conflicting_serial");
+  return [
+    h("div", { class: "section-head" }, h("h2", {}, "Property"), h("span", { class: "provenance" }, "Rules engine")),
+    ...visible.map(pawnCard),
+    visible.length ? null : h("p", { class: "empty" }, "No pawn leads."),
+    excluded.length ? h("details", { class: "disclosure" }, h("summary", {}, `${excluded.length} excluded records`), excluded.map(pawnCard)) : null,
+  ];
 }
 
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
+  const lead = d.pawn.find(p => p.match.status === "exact_serial_lead");
+  const hours = c.window_end != null && c.window_start != null ? Math.max(0, (c.window_end - c.window_start) / 3600) : null;
   fill($("case-heading"),
-    h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
-    h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
-    h("details", { class: "location-details" }, h("summary", {}, "Location"), h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)));
+    h("div", { class: "heading-main" },
+      h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
+      h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
+      h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
+    h("dl", { class: "case-summary" },
+      h("div", { class: "sum", title: "Rules-based prioritization score; not a clearance probability" }, h("dt", {}, "Solvability"),
+        h("dd", {}, h("b", { class: "summary-score" }, s.score.toFixed(0)), h("span", { class: "of" }, "/100"),
+          s.band ? h("span", { class: "score-band " + s.band }, human(s.band)) : null)),
+      h("div", { class: "sum" }, h("dt", {}, "Property"), h("dd", { class: lead ? "mono" : "" }, lead ? lead.match.pawn_id : "No serial lead")),
+      h("div", { class: "sum" }, h("dt", {}, "Series"), h("dd", {}, d.series_id || "Not linked")),
+      h("div", { class: "sum" }, h("dt", {}, "Offense window"), h("dd", {}, hours == null ? "Not recorded" : `${hours < 1 ? hours.toFixed(1) : hours.toFixed(0)} h`))));
   fill(box, 
     h("section", { class: "case-section", id: "evidence-report", role: "tabpanel", "aria-labelledby": "evidence-tab-report", tabindex: "0" },
       reportOverview(c),
-      h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
+      h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`),
+      h("section", { class: "property-overview", "aria-label": "Property leads" }, propertyContents(d))),
     h("section", { class: "case-section", id: "evidence-property", role: "tabpanel", "aria-labelledby": "evidence-tab-property", tabindex: "0", hidden: true },
-      d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
-      d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
-      d.pawn.some((p) => p.match.status === "rejected_conflicting_serial") ?
-        h("details", { class: "disclosure" }, h("summary", {}, `${d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").length} excluded records`),
-          d.pawn.filter((p) => p.match.status === "rejected_conflicting_serial").map(pawnCard)) : null),
+      propertyContents(d)),
     h("section", { class: "case-section", id: "evidence-related", role: "tabpanel", "aria-labelledby": "evidence-tab-related", tabindex: "0", hidden: true },
     d.similar.length ? d.similar.map((x) => {
       const o = x.other, p = x.pair;
@@ -528,7 +552,8 @@ async function selectCase(id) {
   } catch (e) { if (request === selection) toast(e.message); return; }
   S.seriesPick = null;
   $("selected-case-label").textContent = id;
-  $("case-switcher").open = false;
+  // The desktop inbox stays visible; narrow screens use the native disclosure.
+  $("case-switcher").open = !!wideInbox?.matches;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
   globalThis.CasefileMotion?.caseTransition();
   $("case-card").scrollTop = 0;
