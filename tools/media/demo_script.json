@@ -1,0 +1,10 @@
+{"segments": [
+ {"id": "s1", "text": "It's seven A.M. in Cascade City's property crimes unit. Thirty-six burglaries came in overnight.", "pause_after": 0.3},
+ {"id": "s2", "text": "Casefile has already read every report. A small, fast model pulls out how each break-in happened and what was taken, down to serial numbers.", "pause_after": 0.3},
+ {"id": "s3", "text": "On this one, the stolen laptop's serial number turned up at a pawn shop three days later. It's flagged as a lead, not proof of anything.", "pause_after": 0.3},
+ {"id": "s4", "text": "Overnight, seven burglaries were grouped into one series: the same rear sliding door, pried open at night, the same signatures. One of them is already cleared by an arrest.", "pause_after": 0.3},
+ {"id": "s5", "text": "Then the rules engine checks like a referee. In this other group, two break-ins happened at the same time, far apart. Nobody can be in two places at once, so it's rejected.", "pause_after": 0.3},
+ {"id": "s6", "text": "The detective gets a packet where every claim links back to a record, and a to-do list to accept, or reject with a reason.", "pause_after": 0.3},
+ {"id": "s7", "text": "Nothing happens without a person. Every click lands in a tamper-evident audit log.", "pause_after": 0.3},
+ {"id": "s8", "text": "AI suggests. The engine verifies. People decide.", "pause_after": 0.5}
+]}

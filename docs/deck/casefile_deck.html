@@ -48,7 +48,7 @@ th { color: #0f6b73; font-size: 14px; text-transform: uppercase; letter-spacing:
 <tr><td><b>Victim</b></td><td>Hears nothing for weeks</td><td>Gets a plain-language update in their language, approved by staff</td></tr></table>
 <div class="ok">Stage 7 property matching feeds Stage 6: pawn serial hits are leads, never proof of ownership or guilt (pawn records are furnished to police under RCW 19.60.040).</div>
 <div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>3 / 9</span></div></section><section class="slide"><div class="kick">Demo</div><h1>Live from the prototype</h1>
-<div class="cols"><div style="flex:2"><div class="shot ph">UI screenshot</div></div><div><p>75-second walkthrough, recorded runs of real Claude agents replayed offline:</p>
+<div class="cols"><div style="flex:2"><img class="shot" src="ui.png"></div><div><p>75-second walkthrough, recorded runs of real Claude agents replayed offline:</p>
 <ul><li>Overnight queue of 36 reports</li><li>Serial hit vs. look-alike rejected</li><li>Series proposed, then one case ruled out by the engine</li><li>Packet with citations</li><li>Human approval, audit log</li></ul></div></div>
 <div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>4 / 9</span></div></section><section class="slide"><div class="kick">Architecture</div><h1>AI proposes. The engine verifies. A detective decides.</h1>
 <div class="cols"><div>
@@ -98,6 +98,6 @@ th { color: #0f6b73; font-size: 14px; text-transform: uppercase; letter-spacing:
 <li><b>False positives:</b> skeptic agent plus rules engine rejected 10/10 decoy series; a serial match is a lead, not ownership.</li>
 <li><b>Human in the loop:</b> no send, assign or alert action exists without a click; hash-chained audit log; replays give identical output.</li></ul></div>
 <div><h2>Measured inference cost (recorded runs)</h2><table><tr><th>Agent</th><th>Model</th><th>$/run</th><th>n</th></tr><tr><td>extractor</td><td>haiku</td><td>$0.002</td><td>12</td></tr><tr><td>triage</td><td>sonnet</td><td>$0.036</td><td>4</td></tr><tr><td>series_hunter</td><td>sonnet</td><td>$0.078</td><td>1</td></tr><tr><td>skeptic</td><td>opus</td><td>$0.176</td><td>1</td></tr><tr><td>packet_writer</td><td>sonnet</td><td>$0.063</td><td>2</td></tr><tr><td>victim_liaison</td><td>haiku</td><td>$0.002</td><td>1</td></tr><tr><td>series_llm_only</td><td>opus</td><td>$0.266</td><td>3</td></tr></table>
-<p class="small">Right-sized models: the cheapest adequate model per task.</p></div></div>
+<p class="small">Right-sized models: the cheapest adequate model per task. Per-case chain (extractor + triage + packet) about $0.10, so roughly $1.0k a year at 10,000 cases, against the $12k/yr inference line in the Base budget.</p></div></div>
 <div class="ok" style="font-size:22px"><b>Ask:</b> approve a 90-day, one-precinct pilot; scale only if the gates pass. Full program: $130k setup, $62k/yr to run.</div>
 <div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>9 / 9</span></div></section></body></html>

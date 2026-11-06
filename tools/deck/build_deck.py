@@ -76,6 +76,12 @@ extract_line = (
 screens = os.path.join(ROOT, "docs", "deck", "ui.png")
 screen_tag = '<img class="shot" src="ui.png">' if os.path.exists(screens) else '<div class="shot ph">UI screenshot</div>'
 
+chain = sum(avg[a][1] for a in ("extractor", "triage", "packet_writer") if a in avg)
+chain_line = (
+    f"Per-case chain (extractor + triage + packet) about ${chain:.2f}, so roughly ${chain * 10000 / 1000:,.1f}k a year at 10,000 cases, against the ${B['recurring_cost'] and 12:.0f}k/yr inference line in the Base budget."
+    if chain
+    else ""
+)
 inf_rows = ""
 for a in ["extractor", "triage", "series_hunter", "skeptic", "packet_writer", "victim_liaison", "series_llm_only"]:
     if a in avg:
@@ -200,7 +206,7 @@ slides.append(slide(9, "Ethics, trust and the ask", "Cases, not people. Humans d
 <li><b>False positives:</b> skeptic agent plus rules engine rejected {ev['decoys_rejected']}/{len(ev['decoys'])} decoy series; a serial match is a lead, not ownership.</li>
 <li><b>Human in the loop:</b> no send, assign or alert action exists without a click; hash-chained audit log; replays give identical output.</li></ul></div>
 <div><h2>Measured inference cost (recorded runs)</h2><table><tr><th>Agent</th><th>Model</th><th>$/run</th><th>n</th></tr>{inf_rows}</table>
-<p class="small">Right-sized models: the cheapest adequate model per task.</p></div></div>
+<p class="small">Right-sized models: the cheapest adequate model per task. {chain_line}</p></div></div>
 <div class="ok" style="font-size:22px"><b>Ask:</b> approve a 90-day, one-precinct pilot; scale only if the gates pass. Full program: {k(B['one_time_cost'])} setup, {k(B['recurring_cost'])}/yr to run.</div>"""))
 
 doc = f"<!doctype html><html><head><meta charset='utf-8'><title>Casefile</title><style>{CSS}</style></head><body>{''.join(slides)}</body></html>"
