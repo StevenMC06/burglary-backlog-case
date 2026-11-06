@@ -96,10 +96,7 @@ function renderQueue() {
         sv ? h("span", { class: "queue-meter " + sv.band, role: "img", "aria-label": `Solvability ${sv.score.toFixed(0)} out of 100` },
           h("i", { style: `width:${Math.max(0, Math.min(100, sv.score))}%` })) : null,
         h("span", { class: "l2" }, human(c.block)),
-        h("span", { class: "l3" }, human(c.neighborhood)),
-        (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
-          c.flags.pawn_hit === "exact_serial_lead" ? h("span", {}, "Serial lead") : null,
-          c.flags.series_id ? h("span", {}, "Possible series") : null) : null);
+        h("span", { class: "l3" }, human(c.neighborhood)));
       return h("li", {}, btn);
     })
   );
@@ -138,14 +135,14 @@ function pawnCard(p) {
   const title = { exact_serial_lead: ["pass", "Exact serial lead"], rejected_conflicting_serial: ["fail", "Rejected: conflicting serial"],
     review_candidate_marking: ["weak", "Shared marking"], unresolved_similar_description: ["info", "Description only"] }[st];
   return h("div", { class: "card " + cls },
-    h("div", { class: "row-flex" }, h("span", { class: "chip " + title[0] }, title[1]), h("span", { class: "mono" }, m.pawn_id),
+    h("div", { class: "row-flex" }, h("span", { class: "mono" }, m.pawn_id),
       h("span", { class: "kv" }, `+${m.days_after_offense.toFixed(0)} ${Math.round(m.days_after_offense) === 1 ? "day" : "days"}`)),
     h("div", {}, p.item?.description || m.item_id),
     h("div", { class: "serials" },
       h("div", {}, h("span", { class: "kv" }, "Reported serial"), h("span", { class: "mono" }, p.item?.serial || "Not recorded")),
       h("div", {}, h("span", { class: "kv" }, "Pawn serial"), h("span", { class: "mono" }, p.pawn?.serial || "Not recorded"))),
     p.pawn ? h("div", { class: "kv" }, p.pawn.dealer) : null,
-    h("details", { class: "step-details" }, h("summary", {}, "Match details"), h("p", {}, m.reason),
+    h("details", { class: "step-details" }, h("summary", {}, "Match details"), h("p", {}, title[1]), h("p", {}, m.reason),
       st === "exact_serial_lead" ? h("p", {}, h("strong", {}, "Ownership unverified. "), "Seller is not presumed to be the offender.") : null));
 }
 function readableReport(narrative) {
@@ -159,16 +156,16 @@ function reportOverview(c) {
         h("canvas", { class: "globe-canvas", width: "800", height: "800", role: "img", tabindex: "0", "aria-label": "Dotted globe illustration. Drag or use arrow keys to rotate." }),
         h("canvas", { class: "scene-canvas", width: "640", height: "320", "aria-hidden": "true" })),
       h("div", { class: "preview-caption" }, h("span", {}, "Illustration · not evidence"), h("button", { type: "button", class: "globe-replay" }, "Replay zoom ↗"))),
-    h("div", { class: "section-head" }, h("h2", {}, "Report"), h("span", { class: "provenance source" }, "Source record")),
+    h("div", { class: "section-head" }, h("h2", {}, "Report")),
     h("p", { class: "narr source-record" }, c.narrative),
-    h("details", { class: "report-original" }, h("summary", {}, "Plain-English wording"), h("p", { class: "narr" }, readableReport(c.narrative))));
+    h("p", { class: "narr report-readable" }, readableReport(c.narrative)));
 }
 
 function propertyContents(d) {
   const visible = d.pawn.filter(p => p.match.status !== "rejected_conflicting_serial");
   const excluded = d.pawn.filter(p => p.match.status === "rejected_conflicting_serial");
   return [
-    h("div", { class: "section-head" }, h("h2", {}, "Property"), h("span", { class: "provenance" }, "Rules engine")),
+    h("div", { class: "section-head" }, h("h2", {}, "Property")),
     ...visible.map(pawnCard),
     visible.length ? null : h("p", { class: "empty" }, "No pawn leads."),
     excluded.length ? h("details", { class: "disclosure" }, h("summary", {}, `${excluded.length} excluded records`), excluded.map(pawnCard)) : null,
@@ -183,19 +180,18 @@ function renderCase() {
   fill($("case-heading"),
     h("div", { class: "heading-main" },
       h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
-      h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
+      h("h2", {}, c.id),
       h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
     h("dl", { class: "case-summary" },
-      h("div", { class: "sum", title: "Rules-based prioritization score; not a clearance probability" }, h("dt", {}, "Solvability"),
-        h("dd", {}, h("b", { class: "summary-score" }, s.score.toFixed(0)), h("span", { class: "of" }, "/100"),
-          s.band ? h("span", { class: "score-band " + s.band }, human(s.band)) : null)),
+      h("div", { class: "sum" }, h("dt", {}, "Solvability"),
+        h("dd", {}, h("b", { class: "summary-score" }, s.score.toFixed(0)), h("span", { class: "of" }, "/100"))),
       h("div", { class: "sum" }, h("dt", {}, "Property"), h("dd", { class: lead ? "mono" : "" }, lead ? lead.match.pawn_id : "No serial lead")),
       h("div", { class: "sum" }, h("dt", {}, "Series"), h("dd", {}, d.series_id || "Not linked")),
       h("div", { class: "sum" }, h("dt", {}, "Offense window"), h("dd", {}, hours == null ? "Not recorded" : `${hours < 1 ? hours.toFixed(1) : hours.toFixed(0)} h`))));
   fill(box, 
     h("section", { class: "case-section", id: "evidence-report", role: "tabpanel", "aria-labelledby": "evidence-tab-report", tabindex: "0" },
       reportOverview(c),
-      h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`),
+      h("p", { class: "report-time" }, `${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`),
       h("section", { class: "property-overview", "aria-label": "Property leads" }, propertyContents(d))),
     h("section", { class: "case-section", id: "evidence-property", role: "tabpanel", "aria-labelledby": "evidence-tab-property", tabindex: "0", hidden: true },
       propertyContents(d)),
@@ -205,35 +201,15 @@ function renderCase() {
       return h("div", { class: "linked" },
         h("span", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(o.id) }, o.id), h("details", { class: "location-details" }, h("summary", {}, "Location"), h("span", { class: "kv" }, human(o.neighborhood)))),
         h("span", { class: "kv", title: `Similarity ${p.score.toFixed(2)}; ${p.components.shared_signatures} shared signatures` }, `${p.components.distance_km.toFixed(1)} km · ${p.components.days_apart.toFixed(0)} d`));
-    }) : h("p", { class: "empty" }, "No related cases.")),
-    h("details", { class: "disclosure" }, h("summary", {}, "Review factors"),
-      h("div", { class: "score-line" }, h("b", {}, s.score.toFixed(0) + " / 100"), h("span", { class: "kv" }, "Solvability score")), bars(s.contributions),
-      h("p", { class: "kv" }, `Reported ${fmtTime(c.reported_at)} · Extraction ${d.recorded.extractor ? "recorded" : "unavailable"}`))
+    }) : h("p", { class: "empty" }, "No related cases."))
   );
+  fill($("review-factors"),
+    h("div", { class: "section-head" }, h("h2", {}, "Review factors"), h("span", { class: "factor-score" }, s.score.toFixed(0) + " / 100")),
+    bars(s.contributions));
   showEvidence("report");
 }
 
-// ---------------------------------------------------------------- right: packet + steps
-function citeChips(text, d) {
-  const re = /\[([A-Z]{2}-\d{2}-\d{6}|facts|[A-Za-z0-9-]+):([a-z_.]+)(?:=[^\]]*)?\]/g;
-  const out = [];
-  let last = 0, m;
-  while ((m = re.exec(text))) {
-    out.push(text.slice(last, m.index));
-    let val = "see record";
-    if (m[1] === d.case.id) {
-      const v = m[2].split(".").reduce((o, k) => (o == null ? o : o[k]), d.case);
-      if (v != null) val = typeof v === "object" ? JSON.stringify(v) : String(v);
-    }
-    out.push(h("span", { class: "chip cite", tabindex: "0", title: `${m[1]}.${m[2]} = ${val}` }, m[0]));
-    last = m.index + m[0].length;
-  }
-  out.push(text.slice(last));
-  return out;
-}
-function missing(label) {
-  return h("p", { class: "ai-missing" }, `No recorded ${label.replace(/^the /, "")}.`);
-}
+// ---------------------------------------------------------------- right: actions
 async function decide(action, subject, detail) {
   const r = await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ actor: ACTOR, action, subject, detail }) });
@@ -245,9 +221,7 @@ function stepItem(st, i, d) {
   const key = `${d.case.id}#${i}`;
   const done = S.decided[key];
   const li = h("li", { class: "step " + (done ? done.kind : ""), "data-step": String(i + 1).padStart(2, "0") });
-  const body = h("div", {}, h("div", { class: "step-title" }, st.step),
-    h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
-      h("p", { class: "full-step" }, st.step), h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
+  const body = h("div", { class: "step-title" }, st.step);
   li.append(body);
   const btns = h("div", { class: "btns" });
   if (done) {
@@ -307,46 +281,24 @@ function pendingSteps(d) {
 }
 function renderPacket() {
   const d = S.current, pane = $("pane-packet");
-  const pk = d.recorded.packet_writer, tr = d.recorded.triage;
   const pending = pendingSteps(d);
   const completed = d.next_steps.map((step, index) => ({ step, index })).filter(({ index }) => S.decided[`${d.case.id}#${index}`]);
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${pending.length} remaining`)),
-    tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
-    pending.length ? h("ul", { class: "steps featured-step", "aria-live": "polite" }, stepItem(pending[0].step, pending[0].index, d)) : h("p", { class: "complete-status", role: "status" }, "All actions reviewed"),
-    pending.length > 1 ? h("details", { class: "more-actions" }, h("summary", {}, `${pending.length - 1} upcoming actions`),
-      h("ul", { class: "steps" }, pending.slice(1).map(({ step, index }) => stepItem(step, index, d)))) : null,
-    completed.length ? h("details", { class: "more-actions" }, h("summary", {}, `${completed.length} reviewed`),
-      h("ul", { class: "steps" }, completed.map(({ step, index }) => stepItem(step, index, d)))) : null,
-    h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
-    pk ? [h("div", { class: "row-flex" }, pk.output.citations_ok ? null : h("span", { class: "chip weak" }, "Citations need review"),
-        h("span", { class: "kv" }, `${pk.model} · $${pk.cost_usd.toFixed(3)} · ${(pk.duration_ms / 1000).toFixed(0)}s`),
-        h("button", { type: "button", class: "btn sm", onclick: () => replay("packet_writer", d.case.id) }, "Replay")),
-      h("div", { class: "packet-text" }, citeChips(pk.output.packet_markdown || "", d))]
-      : missing("the lead packet"),
-    h("div", { id: "replay-box" })),
-    tr ? h("details", { class: "disclosure" }, h("summary", {}, "Triage rationale"), h("p", { class: "kv" }, tr.output.rationale_with_citations)) : null
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions")),
+    pending.length ? h("ul", { class: "steps", "aria-live": "polite" }, pending.map(({ step, index }) => stepItem(step, index, d))) : h("p", { class: "complete-status", role: "status" }, "All actions reviewed"),
+    completed.length ? h("details", { class: "more-actions" }, h("summary", {}, "Reviewed"),
+      h("ul", { class: "steps" }, completed.map(({ step, index }) => stepItem(step, index, d)))) : null
   );
-}
-async function replay(agent, id) {
-  const box = $("replay-box");
-  try {
-    const t = await api(`/api/replay/${agent}/${id}?speed=2`);
-    box.replaceChildren(h("div", { class: "ai-missing", "aria-live": "polite" }, h("b", {}, `Replaying ${agent} (${t.model})`)));
-    const wrap = box.firstChild;
-    t.events.forEach((e) => setTimeout(() => wrap.append(h("div", { class: "kv" },
-      e.kind === "tool_call" ? `call ${e.name} ${e.input}` : e.kind === "tool_result" ? `result ${e.text}` : e.text)), e.at_ms));
-  } catch (e) { box.replaceChildren(missing(agent + " replay")); }
 }
 
 // ---------------------------------------------------------------- right: series
 function pickSeries() {
   const list = S.series?.series || [];
   const id = S.current?.case.id;
-  return list.find((s) => s.id === S.seriesPick) || list.find((s) => s.in_queue.includes(id)) || list[0];
+  return list.find((s) => s.id === S.seriesPick) || list.find((s) => s.case_ids.includes(id));
 }
 function mapSvg(ser) {
-  const W = 440, H = 250, P = 32;
+  const W = 440, H = 180, P = 24;
   const pts = ser.cases.map((c) => ({ id: c.id, x: c.location.lon * Math.cos((c.location.lat * Math.PI) / 180), y: -c.location.lat, c }));
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -370,35 +322,30 @@ function mapSvg(ser) {
   }
   return el;
 }
-function timelineSvg(ser) {
-  const W = 440, P = 16, label = 126;
-  const sorted = [...ser.cases].sort((a, b) => a.window_start - b.window_start);
-  const H = sorted.length * 36 + 44;
-  const t0 = Math.min(...sorted.map(c => c.window_start)), t1 = Math.max(...sorted.map(c => c.window_end));
-  const x = t => label + ((t - t0) / Math.max(1, t1 - t0)) * (W - label - P);
-  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "series-timeline", role: "img", "aria-label": "Offense windows, one case per row" });
-  sorted.forEach((c, i) => {
-    const y = 22 + i * 36;
-    el.append(svg("text", { x: P, y: y + 4 }, c.id.slice(-6)),
-      svg("line", { x1: label, x2: W - P, y1: y, y2: y, stroke: "#e0e5e8" }),
-      svg("rect", { x: x(c.window_start), y: y - 5, width: Math.max(4, x(c.window_end) - x(c.window_start)), height: 10, rx: 4, fill: ser.in_queue.includes(c.id) ? "#173b63" : "#84939d" }, svg("title", {}, `${c.id}: ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)));
-  });
-  el.append(svg("text", { x: label, y: H - 8 }, fmtTime(t0)), svg("text", { x: W - P, y: H - 8, "text-anchor": "end" }, fmtTime(t1)));
-  return el;
-}
 function renderSeries() {
   const pane = $("pane-series");
   const list = S.series?.series || [];
-  if (!list.length) { pane.replaceChildren(h("p", { class: "empty" }, "No series found for the queue.")); return; }
+  if (!list.length) { pane.replaceChildren(h("p", { class: "empty" }, "No linked series.")); return; }
   const ser = pickSeries();
+  if (!ser) {
+    fill(pane, h("p", { class: "empty" }, "No linked series for this case."),
+      h("div", { class: "series-choices" }, list.map(s => h("button", { type: "button", class: "series-choice", onclick: () => { S.seriesPick = s.id; renderSeries(); } },
+        h("span", { class: "mono" }, s.id), h("span", {}, human(s.cases[0]?.neighborhood || "Other cases"))))));
+    return;
+  }
   const v = ser.verify;
-  const sel = h("select", { "aria-label": "Series", onchange: (e) => { S.seriesPick = e.target.value; renderSeries(); } },
-    list.map((s) => h("option", { value: s.id, selected: s.id === ser.id }, `${s.id} · ${s.case_ids.length} cases · ${s.verify.verdict}`)));
-  const sk = ser.skeptic?.output?.verdicts?.[0];
+  const index = list.indexOf(ser);
+  const move = offset => { S.seriesPick = list[(index + offset + list.length) % list.length].id; renderSeries(); };
+  const cases = [...ser.cases].sort((a, b) => a.window_start - b.window_start);
+  const t0 = Math.min(...cases.map(c => c.window_start)), t1 = Math.max(...cases.map(c => c.window_end));
+  const span = Math.max(1, t1 - t0);
+  const offending = new Set(v.offending_cases);
+  const labels = { spatiotemporal_feasibility: "Time and distance", conflicting_clearance: "Cleared cases", mo_consistency: "Entry pattern", property_consistency: "Stolen items", geographic_spread: "Locations" };
   const key = "series:" + ser.id;
   const done = S.decided[key];
-  const approve = h("button", { type: "button", class: "btn primary", disabled: v.verdict === "fail" || !!done }, done ? "Series alert approved" : "Approve series alert");
+  const approve = h("button", { type: "button", class: "btn primary", disabled: v.verdict === "fail" || !!done }, done ? "Approved" : "Approve series alert");
   approve.onclick = async () => {
+    if (v.verdict === "fail" || S.decided[key]) return;
     approve.disabled = true;
     try {
       await decide("approve_series_alert", ser.id, { case_ids: ser.case_ids, verdict: v.verdict });
@@ -406,18 +353,31 @@ function renderSeries() {
     } catch (e) { toast(e.message); approve.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "row-flex" }, sel),
-    h("details", { class: "disclosure" }, h("summary", {}, "Why these cases?"), h("p", { class: "series-copy" }, ser.rationale)),
-    ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
-    h("h3", {}, "Locations"), mapSvg(ser), h("p", { class: "map-key" }, "Navy: inbox · Burgundy: conflict · Numbers group nearby cases"),
-    h("details", { class: "disclosure" }, h("summary", {}, "Cases and offense windows"), timelineSvg(ser),
-      h("ul", { class: "series-case-list" }, ser.cases.map(c => h("li", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(c.id) }, c.id), h("span", { class: "kv" }, human(c.neighborhood)))))),
-    h("h3", {}, "Link checks"),
-    h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("details", { class: "check-reason" }, h("summary", {}, "Reason"), h("p", { class: "series-copy" }, c.reason))))),
-    h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
-      ser.skeptic && sk ? h("p", { class: "kv" }, sk.reasons_with_citations) : missing("the independent review")),
-    h("div", { class: "row-flex" }, approve),
-    v.verdict === "fail" ? h("p", { class: "kv" }, "Approval blocked by failed link checks.") : null
+    h("div", { class: "series-heading" }, h("h2", {}, "Connected cases"),
+      h("div", { class: "series-nav", "aria-label": "Browse series" },
+        list.length > 1 ? h("button", { type: "button", "aria-label": "Previous series", onclick: () => move(-1) }, "‹") : null,
+        h("span", { class: "mono" }, ser.id),
+        list.length > 1 ? h("button", { type: "button", "aria-label": "Next series", onclick: () => move(1) }, "›") : null)),
+    cases.length ? mapSvg(ser) : null,
+    h("ul", { class: "series-case-list" }, cases.map(c => {
+      const start = Math.max(0, Math.min(100, (c.window_start - t0) / span * 100));
+      const width = Math.max(0, Math.min(100 - start, (c.window_end - c.window_start) / span * 100));
+      const cleared = ser.cleared?.case_id === c.id || c.status?.kind === "cleared_by_arrest";
+      return h("li", {}, h("button", { type: "button", class: "series-case" + (offending.has(c.id) ? " conflict" : ""), "aria-current": String(c.id === S.current?.case.id), onclick: async () => {
+        await selectCase(c.id);
+        if (S.current?.case.id === c.id) { S.seriesPick = ser.id; renderSeries(); showTab("series"); }
+      } },
+        h("span", { class: "series-case-title" }, h("span", { class: "mono" }, c.id), h("span", { class: "series-case-arrow", "aria-hidden": "true" }, "↗")),
+        h("span", { class: "series-case-address" }, human(c.block)),
+        h("span", { class: "series-case-time" }, `${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`),
+        h("span", { class: "case-range", role: "img", "aria-label": `${c.id}: ${fmtTime(c.window_start)} to ${fmtTime(c.window_end)}` }, h("i", { style: `left:${start}%;width:${width}%;` })),
+        cleared ? h("span", { class: "series-case-note" }, "Cleared by arrest") : null));
+    })),
+    h("ul", { class: "series-checks", "aria-label": "Series checks" }, v.checks.map(c => h("li", { class: "series-check " + c.verdict },
+      h("span", { class: "check-symbol", "aria-label": c.verdict === "pass" ? "Passed" : c.verdict === "weak" ? "Needs review" : "Conflict" }, c.verdict === "pass" ? "✓" : "!"),
+      h("div", {}, h("span", {}, labels[c.name] || human(c.name.replace(/_/g, " "))), c.verdict === "pass" ? null : h("p", {}, c.reason))))),
+    h("div", { class: "series-approval" }, approve,
+      v.verdict === "fail" ? h("p", { class: "series-blocked" }, "Resolve the conflicts before approving.") : null)
   );
 }
 
