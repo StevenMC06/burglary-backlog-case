@@ -327,7 +327,7 @@ function mapSvg(ser) {
   for (const p of pts) {
     const q = ser.in_queue.includes(p.id), bad = off.has(p.id), cl = ser.cleared?.case_id === p.id;
     const g = svg("g", {}, svg("title", {}, `${p.id} ${p.c.block}`),
-      svg("circle", { cx: px(p), cy: py(p), r: q ? 6 : 4.5, fill: bad ? "#9c1c1c" : q ? "#1d4f91" : "#6b7f99", stroke: cl ? "#155c33" : "#fff", "stroke-width": cl ? 3 : 1.5 }),
+      svg("circle", { cx: px(p), cy: py(p), r: q ? 6 : 4.5, fill: bad ? "#ff5069" : q ? "#6425ff" : "#6b7f99", stroke: cl ? "#22c457" : "#fff", "stroke-width": cl ? 3 : 1.5 }),
       svg("text", { x: px(p) + (px(p) > W - 70 ? -8 : 8), y: py(p) + 3, "text-anchor": px(p) > W - 70 ? "end" : "start" }, shortId(p.id)));
     el.append(g);
   }
@@ -343,7 +343,7 @@ function timelineSvg(ser) {
   const sorted = [...cs].sort((a, b) => a.window_start - b.window_start);
   sorted.forEach((c, i) => {
     const w = Math.max(3, x(c.window_end) - x(c.window_start));
-    el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#1d4f91" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
+    el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#6425ff" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
     if (ser.in_queue.includes(c.id) || ser.cleared?.case_id === c.id)
       el.append(svg("text", { x: Math.min(Math.max(x(c.window_start), P), W - P), y: 14, "text-anchor": x(c.window_start) > W - 80 ? "end" : "start" }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
   });
@@ -373,7 +373,7 @@ function renderSeries() {
     h("div", { class: "row-flex" }, sel),
     h("div", { class: "kv" }, ser.rationale),
     ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
-    mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
+    mapSvg(ser), h("p", { class: "map-key" }, "Purple: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
     h("h3", {}, "Link checks"),
     h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
     h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
