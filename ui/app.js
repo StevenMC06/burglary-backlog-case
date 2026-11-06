@@ -52,12 +52,6 @@ function anim(el, frames, opts) {
 }
 function rise(el, delay = 0, dy = 6) { return anim(el, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "none" }], { delay }); }
 function stagger(els, step = 30, max = 8) { [...els].slice(0, max).forEach((el, i) => rise(el, i * step)); }
-function countUp(el, to, ms = 520) {
-  if (!el || calm() || typeof requestAnimationFrame !== "function") return;
-  const t0 = performance.now();
-  const tick = (t) => { const k = Math.min(1, (t - t0) / ms); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); };
-  requestAnimationFrame(tick);
-}
 function growBars(root) {
   root?.querySelectorAll?.(".meter i, .bar i").forEach((i, n) =>
     anim(i, [{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 480, delay: 60 + n * 18 }));
@@ -103,20 +97,14 @@ function renderQueue() {
   const q = S.queue;
   const query = $("queue-search").value.trim().toLowerCase();
   const cases = q.cases.filter((c) => `${c.id} ${c.neighborhood} ${c.block}`.toLowerCase().includes(query));
-  $("queue-count").textContent = query ? `${cases.length}/${q.cases.length}` : q.cases.length;
   $("queue-empty").hidden = cases.length > 0;
   const ul = $("queue-list");
   ul.replaceChildren(
     ...cases.map((c) => {
-      const sv = c.solvability;
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
-        h("span", { class: "l1" }, h("span", { class: "qid" }, c.id),
-          sv ? h("span", { class: "qscore", title: `Solvability ${sv.score.toFixed(0)}/100 · ${sv.band}` }, sv.score.toFixed(0)) : null),
+        h("span", { class: "l1" }, h("span", { class: "qid" }, c.id)),
         h("span", { class: "l2" }, human(c.block)),
-        h("span", { class: "l3" }, human(c.neighborhood)),
-        (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
-          c.flags.pawn_hit === "exact_serial_lead" ? h("span", { class: "flag lead" }, "Serial lead") : null,
-          c.flags.series_id ? h("span", { class: "flag series" }, "Possible series") : null) : null);
+        h("span", { class: "l3" }, human(c.neighborhood)));
       return h("li", {}, btn);
     })
   );
@@ -164,26 +152,10 @@ function pawnCard(p) {
 function renderCase() {
   const d = S.current, c = d.case, s = d.solvability;
   const box = $("case-card");
-  const lead = d.pawn.find((p) => p.match.status === "exact_serial_lead");
-  const winH = c.window_end != null && c.window_start != null ? (c.window_end - c.window_start) / 3600 : null;
   fill($("case-heading"),
     h("div", { class: "heading-main" },
-      h("div", { class: "breadcrumb" }, "Inbox / Burglary"),
-      h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
-      h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
-    h("dl", { class: "summary" },
-      h("div", { class: "sum score" },
-        h("dt", {}, "Solvability"),
-        h("dd", {}, h("b", {}, s.score.toFixed(0)), h("span", { class: "of" }, "/100"))),
-      h("div", { class: "sum" },
-        h("dt", {}, "Property"),
-        h("dd", {}, lead ? h("span", { class: "mono" }, lead.match.pawn_id) : "No serial lead")),
-      d.series_id ? h("div", { class: "sum" },
-        h("dt", {}, "Series"),
-        h("dd", {}, d.series_id)) : null,
-      winH != null ? h("div", { class: "sum" },
-        h("dt", {}, "Offense window"),
-        h("dd", {}, `${winH.toFixed(0)} h`)) : null));
+      h("h2", {}, c.id),
+      h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)}`)));
   fill(box, 
     h("section", { class: "case-section" }, h("h2", {}, "Report"),
       h("p", { class: "narr" }, c.narrative),
@@ -240,7 +212,7 @@ function stepItem(st, i, d) {
   const done = S.decided[key];
   const li = h("li", { class: "step " + (done ? done.kind : "") });
   const body = h("div", {}, h("div", { class: "step-title" }, st.step),
-    h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
+    h("details", { class: "step-details" }, h("summary", {}, "Details"),
       h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
   li.append(body);
   const btns = h("div", { class: "btns" });
@@ -282,7 +254,7 @@ function renderPacket() {
   const d = S.current, pane = $("pane-packet");
   const pk = d.recorded.packet_writer, tr = d.recorded.triage;
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions")),
     tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
     h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d))),
     h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
@@ -475,7 +447,6 @@ TABS.forEach((t, i) => {
 
 // ---------------------------------------------------------------- boot
 let selection = 0;
-const data_score = () => S.current?.solvability?.score ?? 0;
 async function selectCase(id) {
   const request = ++selection;
   try {
@@ -489,7 +460,6 @@ async function selectCase(id) {
   stagger($("case-card").children, 35, 4);
   const open = document.querySelector?.(".pane:not([hidden])");
   if (open) stagger(open.children, 30, 5);
-  countUp($("case-heading").querySelector?.(".summary .score b"), Math.round(data_score()));
   growBars($("case-heading"));
   growBars($("case-card"));
   $("case-card").scrollTop = 0;
