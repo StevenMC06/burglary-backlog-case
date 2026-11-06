@@ -87,16 +87,16 @@ function renderScore() {
   const svg = $("waterfall"); svg.replaceChildren();
   const rows = [["intercept", t.intercept], ["MO × 6.0", t.mo], ["ln(1+km) × −1.3", t.dist], ["ln(1+days) × −0.9", t.time], ["signatures × 0.6", t.sig]];
   const X = (v) => 320 + v * 32; let acc = 0;
-  svg.append(el("line", { x1: X(0), x2: X(0), y1: 6, y2: 196, stroke: "#9aa4b1", "stroke-dasharray": "3 3" }));
+  svg.append(el("line", { x1: X(0), x2: X(0), y1: 6, y2: 196, stroke: "#87908a", "stroke-dasharray": "3 3" }));
   rows.forEach(([name, v], i) => {
     const y = 10 + i * 34, x0 = X(acc), x1 = X(acc + v);
-    svg.append(el("text", { x: 8, y: y + 17, "font-size": 12, fill: "#657080" }, name));
-    const r = el("rect", { x: Math.min(x0, x1), y, width: Math.max(1.5, Math.abs(x1 - x0)), height: 24, rx: 3, fill: v >= 0 ? "#276345" : "#a23c34", opacity: .85 });
+    svg.append(el("text", { x: 8, y: y + 17, "font-size": 12, fill: "#555c58" }, name));
+    const r = el("rect", { x: Math.min(x0, x1), y, width: Math.max(1.5, Math.abs(x1 - x0)), height: 24, rx: 3, fill: v >= 0 ? "#0f6a2e" : "#b01836", opacity: .85 });
     r.style.transition = "all .25s"; svg.append(r);
-    svg.append(el("text", { x: Math.max(x0, x1) + 6, y: y + 17, "font-size": 12, fill: "#202936" }, (v >= 0 ? "+" : "") + v.toFixed(2)));
+    svg.append(el("text", { x: Math.max(x0, x1) + 6, y: y + 17, "font-size": 12, fill: "#16131f" }, (v >= 0 ? "+" : "") + v.toFixed(2)));
     acc += v;
   });
-  svg.append(el("text", { x: 8, y: 204, "font-size": 11, fill: "#657080" }, `Σ = z = ${acc.toFixed(2)} → σ(z) = ${sigmoid(acc).toFixed(3)}`));
+  svg.append(el("text", { x: 8, y: 204, "font-size": 11, fill: "#555c58" }, `Σ = z = ${acc.toFixed(2)} → σ(z) = ${sigmoid(acc).toFixed(3)}`));
 }
 ["s-mo", "s-km", "s-days", "s-sig", "s-thr", "s-hasmo"].forEach((id) => $(id).addEventListener("input", renderScore));
 
@@ -107,13 +107,13 @@ function swDraw() {
   $("v-win").textContent = W;
   const X = (d) => 30 + (d / 365) * (cv.width - 60), lane = new Map(CASES.map((c, i) => [c, SW.lanes[i]]));
   g.clearRect(0, 0, cv.width, cv.height);
-  g.fillStyle = "#657080"; g.font = "12px Segoe UI";
+  g.fillStyle = "#555c58"; g.font = "12px Segoe UI";
   for (let m = 0; m <= 12; m++) { const x = X(m * 365 / 12); g.fillRect(x, 200, 1, 6); g.fillText(`${Math.round(m * 30.4)}d`, x - 8, 222); }
   const cur = SW.order[Math.min(SW.p, n - 1)];
-  if (SW.p < n) { g.fillStyle = "rgba(36,90,181,.10)"; g.fillRect(X(cur.day), 4, X(cur.day + W) - X(cur.day), 190); }
+  if (SW.p < n) { g.fillStyle = "rgba(100,37,255,.10)"; g.fillRect(X(cur.day), 4, X(cur.day + W) - X(cur.day), 190); }
   for (let q = 0; q < n; q++) {
     const c = SW.order[q], inWin = SW.p < n && q > SW.p && c.day - cur.day <= W;
-    g.fillStyle = q === SW.p ? "#182534" : inWin ? "#245ab5" : q < SW.p ? "#d5dae1" : "#9aa4b1";
+    g.fillStyle = q === SW.p ? "#16131f" : inWin ? "#6425ff" : q < SW.p ? "#dbe3dd" : "#87908a";
     g.beginPath(); g.arc(X(c.day), 12 + lane.get(c) * 8, q === SW.p ? 6 : 3.5, 0, 7); g.fill();
   }
   const brute = n * (n - 1) / 2;
@@ -150,12 +150,12 @@ function renderBound() {
   for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
     const km = (px / w) * KM, days = (1 - py / h) * D, ok = score(1, km, days, sig) >= thr, o = 4 * (py * w + px);
     if (ok) kept++;
-    img.data.set(ok ? [220, 231, 250, 255] : [246, 247, 249, 255], o);
+    img.data.set(ok ? [235, 227, 255, 255] : [246, 249, 247, 255], o);
   }
   g.clearRect(0, 0, cv.width, cv.height); g.putImageData(img, L, 10);
   // contour: bound == thr  ⇔  1.3 ln(1+km) + 0.9 ln(1+days) = c
   const c = K.INTERCEPT + K.W_MO + K.W_SIG * Math.min(sig, 3) - Math.log(thr / (1 - thr));
-  g.strokeStyle = "#245ab5"; g.lineWidth = 2; g.beginPath(); let started = false;
+  g.strokeStyle = "#6425ff"; g.lineWidth = 2; g.beginPath(); let started = false;
   for (let px = 0; px <= w; px++) {
     const km = (px / w) * KM, days = Math.exp((c + K.W_DIST * Math.log1p(km)) / -K.W_TIME) - 1;
     if (days < 0 || days > D) { started = false; continue; }
@@ -165,10 +165,10 @@ function renderBound() {
   let shown = 0;
   for (const p of PAIRS) {
     if (p.km > KM || (shown++ % 3 && p.bound < thr)) continue;
-    g.fillStyle = p.score >= thr ? "#276345" : p.bound >= thr ? "#245ab5" : "rgba(101,112,128,.35)";
+    g.fillStyle = p.score >= thr ? "#0f6a2e" : p.bound >= thr ? "#6425ff" : "rgba(85,92,88,.35)";
     g.beginPath(); g.arc(L + (p.km / KM) * w, 10 + (1 - p.days / D) * h, p.score >= thr ? 3.5 : 2, 0, 7); g.fill();
   }
-  g.fillStyle = "#657080"; g.font = "12px Segoe UI";
+  g.fillStyle = "#555c58"; g.font = "12px Segoe UI";
   for (let k = 0; k < KM; k += 5) g.fillText(`${k} km`, L + (k / KM) * w - 10, cv.height - 18);
   for (let d = 0; d <= D; d += 30) g.fillText(`${d}d`, 12, 14 + (1 - d / D) * h);
   g.fillText("distance →", cv.width - 80, cv.height - 4); g.fillText("days apart ↑", 12, cv.height - 4);
@@ -177,7 +177,7 @@ function renderBound() {
 ["b-thr", "b-sig"].forEach((id) => $(id).addEventListener("input", renderBound));
 
 // ---- 4. union-find clustering with re-split -------------------------------------------------------
-const PALETTE = ["#245ab5", "#276345", "#a23c34", "#805d16", "#6a3fb5", "#0f7a8a", "#b5487a", "#3f6b2a", "#c2611f", "#2f4f8f"];
+const PALETTE = ["#6425ff", "#0f6a2e", "#b01836", "#6a5500", "#6a3fb5", "#0f7a8a", "#b5487a", "#3f6b2a", "#c2611f", "#2f4f8f"];
 function components(nodes, edges, t) {
   const parent = new Map(nodes.map((i) => [i, i]));
   const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
@@ -205,11 +205,11 @@ function renderClusters() {
   const X = (c) => 20 + (c.x / 20) * 1060, Y = (c) => 15 + (c.y / 14) * 350;
   for (const [i, j, s] of C_EDGES) if (s >= thr) {
     const same = color.get(i) && color.get(i) === color.get(j);
-    svg.append(el("line", { x1: X(CASES[i]), y1: Y(CASES[i]), x2: X(CASES[j]), y2: Y(CASES[j]), stroke: same ? color.get(i) : "#c3cad4",
+    svg.append(el("line", { x1: X(CASES[i]), y1: Y(CASES[i]), x2: X(CASES[j]), y2: Y(CASES[j]), stroke: same ? color.get(i) : "#c9d2cc",
       "stroke-width": same ? 1.6 : 1, opacity: same ? .75 : .5, "stroke-dasharray": same ? "" : "4 3" }));
   }
   CASES.forEach((c, i) => {
-    const node = el("circle", { cx: X(c), cy: Y(c), r: color.has(i) ? 6 : 3.5, fill: color.get(i) || "#c3cad4", stroke: c.series >= 0 ? "#182534" : "none", "stroke-width": 1.2 });
+    const node = el("circle", { cx: X(c), cy: Y(c), r: color.has(i) ? 6 : 3.5, fill: color.get(i) || "#c9d2cc", stroke: c.series >= 0 ? "#16131f" : "none", "stroke-width": 1.2 });
     node.append(el("title", {}, `${c.id}${c.series >= 0 ? " (planted series " + c.series + ")" : " (background)"} · day ${c.day.toFixed(0)}`));
     svg.append(node);
   });
@@ -285,18 +285,18 @@ $("pw-next").onclick = () => { PW.item = (PW.item + 1) % ITEMS.length; renderPaw
 // ---- 7. benchmark bars (log scale) ----------------------------------------------------------------
 function renderBench() {
   const svg = $("bench-svg"); svg.replaceChildren();
-  if (!BENCH.length) { svg.append(el("text", { x: 20, y: 40, fill: "#657080" }, "Run casefile bench to populate.")); return; }
+  if (!BENCH.length) { svg.append(el("text", { x: 20, y: 40, fill: "#555c58" }, "Run casefile bench to populate.")); return; }
   const lo = Math.log10(5), hi = Math.log10(Math.max(...BENCH.map((b) => b.ref)) * 1.3), X = (ms) => 260 + ((Math.log10(ms) - lo) / (hi - lo)) * 800;
-  [10, 100, 1000, 10000, 100000].forEach((t) => { if (Math.log10(t) > hi) return; svg.append(el("line", { x1: X(t), x2: X(t), y1: 10, y2: 300, stroke: "#e3e6eb" }));
-    svg.append(el("text", { x: X(t) - 14, y: 320, "font-size": 11, fill: "#657080" }, t >= 1000 ? `${t / 1000}s` : `${t}ms`)); });
+  [10, 100, 1000, 10000, 100000].forEach((t) => { if (Math.log10(t) > hi) return; svg.append(el("line", { x1: X(t), x2: X(t), y1: 10, y2: 300, stroke: "#d5ddd7" }));
+    svg.append(el("text", { x: X(t) - 14, y: 320, "font-size": 11, fill: "#555c58" }, t >= 1000 ? `${t / 1000}s` : `${t}ms`)); });
   BENCH.forEach((b, i) => {
     const y = 14 + i * 32;
-    svg.append(el("text", { x: 8, y: y + 17, "font-size": 12, fill: "#202936" }, `${b.step} · ${fmt(b.cases)} cases`));
-    for (const [v, fill, dy] of [[b.ref, "#c3cad4", 0], [b.opt, "#245ab5", 13]]) {
+    svg.append(el("text", { x: 8, y: y + 17, "font-size": 12, fill: "#16131f" }, `${b.step} · ${fmt(b.cases)} cases`));
+    for (const [v, fill, dy] of [[b.ref, "#c9d2cc", 0], [b.opt, "#6425ff", 13]]) {
       const r = el("rect", { x: 260, y: y + dy, height: 11, rx: 2, fill, width: 0 }); svg.append(r);
       requestAnimationFrame(() => { r.style.transition = `width 1.1s ${i * 60}ms cubic-bezier(.2,.8,.2,1)`; r.setAttribute("width", Math.max(2, X(v) - 260)); });
     }
-    svg.append(el("text", { x: Math.max(X(b.ref), X(b.opt)) + 8, y: y + 17, "font-size": 12, "font-weight": 600, fill: "#276345" }, `${(b.ref / b.opt).toFixed(1)}×`));
+    svg.append(el("text", { x: Math.max(X(b.ref), X(b.opt)) + 8, y: y + 17, "font-size": 12, "font-weight": 600, fill: "#0f6a2e" }, `${(b.ref / b.opt).toFixed(1)}×`));
   });
 }
 

@@ -30,7 +30,7 @@ Rust workspace: case linkage plus pawn/serial matching, detective-approved next 
 
 ## How the engine works
 
-**Interactive version:** run the console and open **`/algo.html`** (button "How it works"): live sliders for the score, an animated time sweep, the pruning region over real pairs, union-find clustering with re-split, a step-through top-k heap and the pawn index.
+**Interactive version:** run the console and open **`/algo.html`** (button "How it works"), or just open `ui/algo.html` in a browser. It starts with a one-minute plain-English explanation, then the interactive panels, then **every formula with proofs** (KaTeX, vendored, works offline). The panels: live sliders for the score, an animated time sweep, the pruning region over real pairs, union-find clustering with re-split, a step-through top-k heap and the pawn index.
 
 ```mermaid
 flowchart LR
