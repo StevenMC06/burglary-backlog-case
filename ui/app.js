@@ -48,10 +48,33 @@ function meter(score, band) {
   return h("span", { class: "meter " + (BAND[band] || ""), role: "img", "aria-label": `Solvability ${Math.round(score)} of 100, ${band}` },
     h("i", { style: `width:${Math.max(2, Math.min(100, score)).toFixed(0)}%` }));
 }
+// ---------------------------------------------------------------- motion
+// Web Animations API directly (what motion.dev wraps), so no library or CDN. Short and interruptible;
+// skipped for prefers-reduced-motion and where element.animate is missing (tests, old browsers).
+const EASE = "cubic-bezier(.22,.9,.24,1)";
+const calm = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function anim(el, frames, opts) {
+  if (!el || typeof el.animate !== "function" || calm()) return null;
+  return el.animate(frames, { duration: 220, easing: EASE, fill: "backwards", ...opts });
+}
+function rise(el, delay = 0, dy = 6) { return anim(el, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "none" }], { delay }); }
+function stagger(els, step = 30, max = 8) { [...els].slice(0, max).forEach((el, i) => rise(el, i * step)); }
+function countUp(el, to, ms = 520) {
+  if (!el || calm() || typeof requestAnimationFrame !== "function") return;
+  const t0 = performance.now();
+  const tick = (t) => { const k = Math.min(1, (t - t0) / ms); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+function growBars(root) {
+  root?.querySelectorAll?.(".meter i, .bar i").forEach((i, n) =>
+    anim(i, [{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 480, delay: 60 + n * 18 }));
+}
+
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
   t.hidden = false;
+  anim(t, [{ opacity: 0, transform: "translate(-50%, 10px) scale(.98)" }, { opacity: 1, transform: "translate(-50%, 0) scale(1)" }], { duration: 240 });
   clearTimeout(toast.t);
   toast.t = setTimeout(() => (t.hidden = true), 2600);
 }
@@ -242,20 +265,26 @@ function stepItem(st, i, d) {
       accept.disabled = reject.disabled = true;
       try {
         await decide("accept_step", d.case.id, { step: st.step, source: st.source });
-        S.decided[key] = { kind: "accepted" }; renderPacket();
+        S.decided[key] = { kind: "accepted" }; S.flash = key; renderPacket();
       } catch (e) { toast(e.message); accept.disabled = reject.disabled = false; }
     };
-    reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; sel.focus(); };
+    reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; [sel, note, confirm].forEach((el, i) => rise(el, i * 40, 0)); sel.focus(); };
     confirm.onclick = async () => {
       confirm.disabled = accept.disabled = true;
       try {
         await decide("reject_step", d.case.id, { step: st.step, reason: sel.value, note: note.value.slice(0, 200), source: st.source });
-        S.decided[key] = { kind: "rejected", reason: sel.value }; renderPacket();
+        S.decided[key] = { kind: "rejected", reason: sel.value }; S.flash = key; renderPacket();
       } catch (e) { toast(e.message); confirm.disabled = accept.disabled = false; }
     };
     btns.append(accept, reject, sel, note, confirm);
   }
   li.append(btns);
+  if (S.flash === key) {
+    S.flash = null;
+    const ok = done?.kind === "accepted";
+    anim(li, [{ boxShadow: `0 0 0 3px var(${ok ? "--pass-bg" : "--fail-bg"})`, transform: "scale(1.01)" }, { boxShadow: "0 0 0 0 transparent", transform: "none" }], { duration: 520, fill: "none" });
+    anim(li.querySelector?.(".chip"), [{ opacity: 0, transform: "translateX(-6px)" }, { opacity: 1, transform: "none" }], { duration: 260 });
+  }
   return li;
 }
 function renderPacket() {
@@ -421,7 +450,10 @@ function renderTeam() {
 function openDrawer(id) {
   for (const d of document.querySelectorAll(".drawer")) d.hidden = d.id !== id ? true : !d.hidden;
   const d = $(id);
-  if (!d.hidden) d.querySelector("[data-close]").focus();
+  if (!d.hidden) {
+    anim(d, [{ opacity: 0, transform: "translateX(24px)" }, { opacity: 1, transform: "none" }], { duration: 280 });
+    d.querySelector("[data-close]").focus();
+  }
 }
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => { b.closest(".drawer").hidden = true; }));
 $("btn-audit").onclick = async () => { await loadAudit().catch(() => {}); openDrawer("drawer-audit"); };
@@ -435,7 +467,9 @@ function showTab(name) {
     const on = t === name;
     $("tab-" + t).setAttribute("aria-selected", String(on));
     $("tab-" + t).tabIndex = on ? 0 : -1;
-    $("pane-" + t).hidden = !on;
+    const pane = $("pane-" + t), was = pane.hidden;
+    pane.hidden = !on;
+    if (on && was) stagger(pane.children, 25, 6);
   });
 }
 TABS.forEach((t, i) => {
@@ -450,6 +484,7 @@ TABS.forEach((t, i) => {
 
 // ---------------------------------------------------------------- boot
 let selection = 0;
+const data_score = () => S.current?.solvability?.score ?? 0;
 async function selectCase(id) {
   const request = ++selection;
   try {
@@ -459,6 +494,13 @@ async function selectCase(id) {
   } catch (e) { if (request === selection) toast(e.message); return; }
   S.seriesPick = null;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
+  rise($("case-heading"));
+  stagger($("case-card").children, 35, 4);
+  const open = document.querySelector?.(".pane:not([hidden])");
+  if (open) stagger(open.children, 30, 5);
+  countUp($("case-heading").querySelector?.(".summary .score b"), Math.round(data_score()));
+  growBars($("case-heading"));
+  growBars($("case-card"));
   $("case-card").scrollTop = 0;
   document.querySelectorAll(".pane").forEach((p) => { p.scrollTop = 0; });
 }
@@ -471,6 +513,8 @@ async function main() {
     return;
   }
   renderKpi(); renderQueue(); renderTeam();
+  stagger($("queue-list").children, 22, 12);
+  growBars($("queue-list"));
   await loadAudit().catch(() => {});
   const first = new URLSearchParams(location.search).get("case") || S.queue.cases[0]?.id;
   if (first) await selectCase(first);

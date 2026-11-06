@@ -78,7 +78,7 @@ h3 { font-size: 12px; font-weight: 650; margin: 20px 0 8px; text-transform: uppe
 .actions { display: flex; gap: 8px; }
 
 /* ---------------------------------------------------------------- buttons */
-.btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; line-height: 1.4; transition: background .12s, border-color .12s; }
+.btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; line-height: 1.4; }
 .btn:hover { background: var(--sunk); border-color: var(--faint); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
@@ -257,7 +257,16 @@ td.on { background: var(--info-bg); color: var(--info); }
 td.gate { background: var(--weak-bg); color: var(--weak); }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bar); color: var(--bar-ink); border: 1px solid var(--bar-line); padding: 9px 16px; border-radius: 6px; z-index: 20; font-size: 13px; box-shadow: var(--shadow); }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* motion: hover and press feedback in CSS; entrances are Web Animations in app.js */
+.meter i, .bar i.pos { transform-origin: left center; }
+.bar i.neg { transform-origin: right center; }
+.qbtn { transition: background .16s ease, box-shadow .2s ease; }
+.tabs button { transition: color .15s ease, border-color .2s ease; }
+.btn { transition: background .14s ease, border-color .14s ease, transform .1s ease; }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.step { transition: border-color .2s ease, background .25s ease; }
+.linkbtn, summary { transition: color .14s ease; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 @media (min-width: 1600px) { .case, .pane { padding: 24px 32px; } .case-body { grid-template-columns: minmax(0, 1.1fr) minmax(400px, 1fr); } }
 @media (max-width: 1100px) {
   .grid { grid-template-columns: 236px minmax(0, 1fr); }
