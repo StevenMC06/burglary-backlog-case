@@ -9,7 +9,7 @@ Dataset: 2000 cases, 1500 pawn records, 40 planted series, 10 decoys. Engine: ca
 | engine clusters (threshold 0.9) | 63% | 100% | 77% | 38/40 |
 | + verify_series pruning | 66% | 100% | 79% | 38/40 |
 
-Runtime: 1.92 s for 2000 cases.
+Runtime: 0.06 s for 2000 cases.
 
 Operating points (engine clusters + verify pruning):
 
@@ -28,7 +28,9 @@ Operating points (engine clusters + verify pruning):
 
 ## 3. Stolen-property matching
 
-Exact-serial leads: 100 (100 correct, precision 100%). Resurfaced items found as lead or review candidate: 113/116 (recall 97%). Conflicting-serial look-alikes rejected: 83588. Marking candidates for human review: 2825.
+Exact-serial leads: 100 (100 correct, precision 100%). Resurfaced items found as lead or review candidate: 113/116 (recall 97%). Conflicting-serial look-alikes rejected: 83587. Marking candidates for human review: 2825.
+
+10 further pawn records on 9 queue cases were hand-planted for the demo (a curated mix of lead types, not a measured rate). Those records and cases are excluded from every number above.
 
 ## 4. Extraction (Extractor agent, recorded runs: 12)
 

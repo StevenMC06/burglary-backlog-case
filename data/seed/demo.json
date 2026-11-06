@@ -69,5 +69,68 @@
     "CC-26-001998",
     "CC-26-001999",
     "CC-26-002000"
-  ]
+  ],
+  "queue_leads": [
+    {
+      "case_id": "CC-26-001975",
+      "item_id": "CC-26-001975-I2",
+      "kind": "marking_candidate",
+      "pawn_id": "PW-26-001501"
+    },
+    {
+      "case_id": "CC-26-001978",
+      "item_id": "CC-26-001978-I1",
+      "kind": "marking_candidate",
+      "pawn_id": "PW-26-001502"
+    },
+    {
+      "case_id": "CC-26-001976",
+      "item_id": "CC-26-001976-I2",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001503"
+    },
+    {
+      "case_id": "CC-26-001976",
+      "item_id": "CC-26-001976-I2",
+      "kind": "rejected_serial",
+      "pawn_id": "PW-26-001504"
+    },
+    {
+      "case_id": "CC-26-001982",
+      "item_id": "CC-26-001982-I1",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001505"
+    },
+    {
+      "case_id": "CC-26-001985",
+      "item_id": "CC-26-001985-I1",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001506"
+    },
+    {
+      "case_id": "CC-26-001986",
+      "item_id": "CC-26-001986-I1",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001507"
+    },
+    {
+      "case_id": "CC-26-001987",
+      "item_id": "CC-26-001987-I2",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001508"
+    },
+    {
+      "case_id": "CC-26-001989",
+      "item_id": "CC-26-001989-I1",
+      "kind": "exact_serial",
+      "pawn_id": "PW-26-001509"
+    },
+    {
+      "case_id": "CC-26-001991",
+      "item_id": "CC-26-001991-I1",
+      "kind": "rejected_serial",
+      "pawn_id": "PW-26-001510"
+    }
+  ],
+  "queue_leads_note": "Curated for the demo: delayed-report queue cases with planted pawn records, one per lead path. A showcase mix, not a measured rate; the cost model's resurfacing assumption is unchanged and evals exclude these records."
 }

@@ -190,6 +190,13 @@ pub struct GroundTruth {
     pub mo_truth: std::collections::BTreeMap<String, Mo>,
     /// Pawn record id -> (case id, item id) for items that truly resurfaced.
     pub pawn_truth: std::collections::BTreeMap<String, (String, String)>,
+    /// Pawn records hand-planted so the demo queue exercises every lead path. They are not part of
+    /// the measured dataset: evals exclude them, and they are never evidence of performance.
+    #[serde(default)]
+    pub demo_pawn: Vec<String>,
+    /// Queue cases hand-edited into delayed reports for those records. Evals leave their pawn hits out too.
+    #[serde(default)]
+    pub demo_cases: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

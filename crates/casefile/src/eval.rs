@@ -111,7 +111,7 @@ pub struct Subset {
 }
 
 /// Deterministic subsets: whole planted series + decoy members + singletons, by size.
-fn make_subsets(ds: &Dataset, truth: &GroundTruth) -> Vec<Subset> {
+pub(crate) fn make_subsets(ds: &Dataset, truth: &GroundTruth) -> Vec<Subset> {
     let in_series: BTreeSet<&String> = truth.series.iter().flatten().collect();
     let singletons: Vec<&String> =
         ds.cases.iter().map(|c| &c.id).filter(|id| !in_series.contains(id)).collect();
@@ -192,7 +192,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     md.push_str(&format!(
         "Dataset: {} cases, {} pawn records, {} planted series, {} decoys. Engine: {}.\n\n",
         ds.cases.len(),
-        ds.pawn.len(),
+        ds.pawn.len() - truth.demo_pawn.len().min(ds.pawn.len()),
         truth.series.len(),
         truth.decoys.len(),
         casefile_core::ENGINE_VERSION
@@ -250,7 +250,13 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     ));
 
     // 3. Property matching.
-    let hits = property::all_hits(ds);
+    // Demo-queue pawn records are planted to exercise the UI; they are not measured data.
+    let demo_pawn: BTreeSet<&String> = truth.demo_pawn.iter().collect();
+    let demo_cases: BTreeSet<&String> = truth.demo_cases.iter().collect();
+    let hits: Vec<_> = property::all_hits(ds)
+        .into_iter()
+        .filter(|h| !demo_pawn.contains(&h.pawn_id) && !demo_cases.contains(&h.case_id))
+        .collect();
     let truth_pairs: BTreeSet<(String, String, String)> = truth
         .pawn_truth
         .iter()
@@ -278,6 +284,13 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         pct(if truth_pairs.is_empty() { 0.0 } else { found_truth as f64 / truth_pairs.len() as f64 }),
         rejected_conflicts, marking
     ));
+    if !demo_pawn.is_empty() {
+        md.push_str(&format!(
+            "{} further pawn records on {} queue cases were hand-planted for the demo (a curated mix of lead types, not a measured rate). Those records and cases are excluded from every number above.\n\n",
+            demo_pawn.len(),
+            demo_cases.len()
+        ));
+    }
 
     // 4. Extraction accuracy.
     let runs = Store::runs_in(&root, "extractor");

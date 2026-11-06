@@ -135,7 +135,7 @@
   "decoys_rejected": 10,
   "extraction_runs": 12,
   "property": {
-    "conflicts_rejected": 83588,
+    "conflicts_rejected": 83587,
     "exact_correct": 100,
     "exact_leads": 100,
     "found": 113,

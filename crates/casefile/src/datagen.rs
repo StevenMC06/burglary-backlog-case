@@ -1031,6 +1031,125 @@ impl Gen {
             }
         }
     }
+
+    /// Curate the demo queue: turn a few queue cases into delayed reports (the victim was away,
+    /// like the hero laptop case) and plant a pawn record for each, so the queue shows every lead
+    /// path: exact serial, marking for human review, and a rejected look-alike serial.
+    ///
+    /// Isolation: runs on its own PRNG stream after the base dataset is final, so every other case,
+    /// pawn record and id is byte-identical to a run without it. Planted records get ids after the
+    /// base ledger and are listed in `truth.demo_pawn`, which evals exclude. Cases in series or
+    /// decoy groups, the hero cases and the oldest `RECORDED_QUEUE` queue cases are never edited.
+    fn plant_queue_leads(
+        &mut self,
+        seed: u64,
+        cases: &mut [Case],
+        queue_ids: &[String],
+        skip: &HashSet<String>,
+        pawn: &mut Vec<PawnRecord>,
+        truth: &mut GroundTruth,
+    ) -> Vec<QueueLead> {
+        let saved = std::mem::replace(&mut self.rng, Rng(seed ^ LEAD_SEED_SALT));
+        let sellable = |it: &StolenItem| {
+            !matches!(it.category, PropertyType::Firearm | PropertyType::Jewelry | PropertyType::Cash | PropertyType::Other)
+        };
+        let etched = |it: &StolenItem| it.markings.iter().any(|m| m.starts_with("etched ZX-"));
+        let mut leads: Vec<QueueLead> = vec![];
+        let mut used: HashSet<String> = HashSet::new();
+        for (kind, want) in [("marking_candidate", N_LEAD_MARKING), ("exact_serial", N_LEAD_EXACT), ("rejected_serial", N_LEAD_REJECTED)] {
+            let mut done = 0;
+            for id in queue_ids.iter().skip(RECORDED_QUEUE) {
+                if done == want {
+                    break;
+                }
+                if skip.contains(id) || used.contains(id) {
+                    continue;
+                }
+                let Some(ci) = cases.iter().position(|c| &c.id == id) else { continue };
+                let item_idx = if kind == "marking_candidate" {
+                    cases[ci].items.iter().position(|it| sellable(it) && etched(it))
+                } else {
+                    cases[ci].items.iter().position(|it| sellable(it) && it.serial.is_some())
+                };
+                let Some(ii) = item_idx else { continue };
+
+                // Delayed report: the window ended 4-9 days before the report and spans 30-90 h.
+                let gap = self.rng.range(4, 9);
+                let c = &mut cases[ci];
+                let we = c.reported_at - gap * DAY - self.rng.range(0, 11) * 3600;
+                let span = self.rng.range(30, 90);
+                let ws = we - span * 3600;
+                c.window_end = we;
+                c.window_start = ws;
+                c.facts.window_hours = span as f64;
+                c.facts.traceable_property = true;
+                let (ws_l, we_l) = (ws - TZ, we - TZ);
+                if let Some(mo) = c.mo.as_mut() {
+                    mo.time_band = TimeBand::Unknown;
+                    mo.weekday = is_weekday(ws_l.div_euclid(DAY));
+                }
+                if let Some(mo) = c.mo.clone() {
+                    c.narrative = self.narrative(&mo, &c.items, &c.facts, ws_l, we_l);
+                    truth.mo_truth.insert(c.id.clone(), mo);
+                }
+
+                // The record reaches the ledger 1+ days after the window and before the report.
+                let it = c.items[ii].clone();
+                let received = we + self.rng.range(1, gap - 1) * DAY + self.rng.range(0, 11) * 3600;
+                let serial = match kind {
+                    "exact_serial" => it.serial.clone().map(|s| {
+                        // Formatting noise only (dash, case, spaces). The O-for-0 misread variant is the
+                        // base ledger's deliberate near-miss; a showcase lead must actually match.
+                        let want = casefile_core::property::normalize_serial(&s);
+                        loop {
+                            let v = self.variant(&s);
+                            if casefile_core::property::normalize_serial(&v) == want {
+                                break v;
+                            }
+                        }
+                    }),
+                    "rejected_serial" => Some(self.other_serial(it.serial.as_deref())),
+                    _ => None,
+                };
+                let mut recs: Vec<(PawnRecord, &'static str)> = vec![];
+                let seller = self.seller();
+                recs.push((self.pawn_rec(&it, serial, received, seller), kind));
+                if kind == "exact_serial" && done == 0 {
+                    // One exact lead also carries a same-model different-serial look-alike.
+                    let other = self.other_serial(it.serial.as_deref());
+                    let seller = self.seller();
+                    recs.push((self.pawn_rec(&it, Some(other), we + DAY, seller), "rejected_serial"));
+                }
+                for (mut rec, k) in recs {
+                    let (y, _, _) = civil_from_days((rec.received_at - TZ).div_euclid(DAY));
+                    rec.id = format!("PW-{:02}-{:06}", y % 100, pawn.len() + 1);
+                    truth.demo_pawn.push(rec.id.clone());
+                    leads.push(QueueLead { case_id: c.id.clone(), item_id: it.id.clone(), pawn_id: rec.id.clone(), kind: k });
+                    pawn.push(rec);
+                }
+                used.insert(id.clone());
+                truth.demo_cases.push(id.clone());
+                done += 1;
+            }
+        }
+        self.rng = saved;
+        leads
+    }
+}
+
+/// Queue cases with recorded agent runs in `data/recordings` (the oldest by id). Never edited.
+const RECORDED_QUEUE: usize = 9;
+const N_LEAD_EXACT: usize = 6;
+const N_LEAD_MARKING: usize = 2;
+const N_LEAD_REJECTED: usize = 1;
+const LEAD_SEED_SALT: u64 = 0xD30F_1EAD_0B00_0001;
+
+/// A pawn record planted for the demo queue.
+struct QueueLead {
+    case_id: String,
+    item_id: String,
+    pawn_id: String,
+    kind: &'static str,
 }
 
 struct PawnDraft {
@@ -1223,6 +1342,24 @@ pub fn generate(pts: &[Pt], seed: u64, n_cases: usize) -> anyhow::Result<Generat
         pawn.push(rec);
     }
 
+    // Curated demo-queue leads (own PRNG stream; the rest of the dataset is unaffected).
+    // Never curate: planted series/decoys, the hero cases, or any case in an eval subset (the
+    // recorded single-LLM runs were made against those cases' text).
+    let subset_cases: Vec<String> = crate::eval::make_subsets(&Dataset { cases: cases.clone(), pawn: vec![] }, &truth)
+        .into_iter()
+        .flat_map(|s| s.case_ids)
+        .collect();
+    let skip: HashSet<String> = truth
+        .series
+        .iter()
+        .flatten()
+        .chain(truth.decoys.iter().flat_map(|d| d.case_ids.iter()))
+        .cloned()
+        .chain(subset_cases)
+        .chain([hero_pawn.clone(), hero_weak.clone()])
+        .collect();
+    let leads = g.plant_queue_leads(seed, &mut cases, &queue_ids, &skip, &mut pawn, &mut truth);
+
     // Demo picks (read before clearing queue MOs).
     let hero_series_ids = truth.series.first().cloned().unwrap_or_default();
     let find = |id: &str| cases.iter().find(|c| c.id == id);
@@ -1254,6 +1391,10 @@ pub fn generate(pts: &[Pt], seed: u64, n_cases: usize) -> anyhow::Result<Generat
             "offending_case": d.case_ids.last(),
         })),
         "hero_weak": { "case_id": hero_weak },
+        "queue_leads": leads.iter().map(|l| json!({
+            "case_id": l.case_id, "item_id": l.item_id, "pawn_id": l.pawn_id, "kind": l.kind,
+        })).collect::<Vec<_>>(),
+        "queue_leads_note": "Curated for the demo: delayed-report queue cases with planted pawn records, one per lead path. A showcase mix, not a measured rate; the cost model's resurfacing assumption is unchanged and evals exclude these records.",
     });
 
     // Overnight queue cases await extraction.
@@ -1465,6 +1606,63 @@ mod tests {
         let weak = by_id(&g.ds, g.demo["hero_weak"]["case_id"].as_str().unwrap());
         assert!(qs.contains(&weak.id));
         assert!(!weak.facts.traceable_property && !weak.facts.witness && !weak.facts.video_available);
+    }
+
+    #[test]
+    fn queue_leads_cover_every_path_and_stay_isolated() {
+        use casefile_core::{property, MatchStatus};
+        let g = mk(7);
+        let leads = g.demo["queue_leads"].as_array().unwrap();
+        let q: Vec<String> = serde_json::from_value(g.demo["queue"].clone()).unwrap();
+        let kinds = |k: &str| leads.iter().filter(|l| l["kind"] == k).count();
+        assert_eq!(kinds("exact_serial"), N_LEAD_EXACT);
+        assert_eq!(kinds("marking_candidate"), N_LEAD_MARKING);
+        assert_eq!(kinds("rejected_serial"), N_LEAD_REJECTED + 1, "one extra look-alike on the first exact lead");
+        // Planted records sit after the base ledger, are excluded from evals, and are not truth.
+        assert_eq!(g.ds.pawn.len(), PAWN_TARGET + leads.len());
+        assert_eq!(g.truth.demo_pawn.len(), leads.len());
+        assert_eq!(g.truth.demo_cases.len(), N_LEAD_EXACT + N_LEAD_MARKING + N_LEAD_REJECTED);
+        let ids: HashSet<&str> = g.ds.pawn.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids.len(), g.ds.pawn.len(), "pawn ids unique");
+        let hero = g.demo["hero_pawn"]["case_id"].as_str().unwrap();
+        let weak = g.demo["hero_weak"]["case_id"].as_str().unwrap();
+        let in_subset: HashSet<String> =
+            crate::eval::make_subsets(&g.ds, &g.truth).into_iter().flat_map(|s| s.case_ids).collect();
+        let in_group: HashSet<&String> =
+            g.truth.series.iter().flatten().chain(g.truth.decoys.iter().flat_map(|d| d.case_ids.iter())).collect();
+        for l in leads {
+            let (cid, pid) = (l["case_id"].as_str().unwrap(), l["pawn_id"].as_str().unwrap());
+            assert!(g.truth.demo_pawn.iter().any(|d| d == pid));
+            assert!(!g.truth.pawn_truth.contains_key(pid));
+            // Curated cases come from the queue, never the heroes, recorded cases or planted groups.
+            let pos = q.iter().position(|x| x == cid).expect("lead case is in the queue");
+            assert!(pos >= RECORDED_QUEUE && cid != hero && cid != weak && !in_group.contains(&cid.to_string()));
+            assert!(!in_subset.contains(cid), "{cid} is in an eval subset");
+            // Timeline: a delayed report, and the record arrives inside the window-to-report span.
+            let (c, p) = (by_id(&g.ds, cid), g.ds.pawn.iter().find(|p| p.id == pid).unwrap());
+            assert!(c.window_end <= c.reported_at - 4 * DAY);
+            assert!(p.received_at >= c.window_start && p.received_at < c.reported_at);
+            assert!(c.facts.traceable_property && (c.facts.window_hours - (c.window_end - c.window_start) as f64 / 3600.0).abs() < 1e-9);
+            // The matcher agrees with the planted kind.
+            let want = match l["kind"].as_str().unwrap() {
+                "exact_serial" => MatchStatus::ExactSerialLead,
+                "marking_candidate" => MatchStatus::ReviewCandidateMarking,
+                _ => MatchStatus::RejectedConflictingSerial,
+            };
+            let m = property::match_case(&g.ds, cid);
+            let got = m.iter().find(|m| m.pawn_id == pid).unwrap_or_else(|| panic!("{pid} not matched to {cid}"));
+            assert_eq!(got.status, want, "{cid} {pid}");
+            assert_eq!(got.item_id, l["item_id"].as_str().unwrap());
+        }
+        // Each lead case is a delayed report whose narrative and truth MO match its new window.
+        for cid in leads.iter().map(|l| l["case_id"].as_str().unwrap()).collect::<HashSet<_>>() {
+            let t = g.truth.mo_truth.get(cid).unwrap();
+            assert_eq!(t.time_band, TimeBand::Unknown);
+            assert!(by_id(&g.ds, cid).mo.is_none(), "queue cases still await extraction");
+        }
+        // Heroes keep their exact original timing.
+        let hp = by_id(&g.ds, hero);
+        assert_eq!(hp.reported_at - hp.window_end, 5 * DAY + 10 * 3600);
     }
 
     #[test]
