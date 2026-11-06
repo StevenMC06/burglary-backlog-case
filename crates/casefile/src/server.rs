@@ -176,10 +176,60 @@ fn run_json(r: &RecordedRun) -> Value {
     })
 }
 
-const VICTIM_TEMPLATE_ES: &str = "Estimado/a residente: su denuncia {ID} fue recibida y revisada por nuestro equipo. \
-Un detective tiene el caso y le avisaremos cuando haya novedades que podamos compartir. \
-No podemos dar detalles de la investigacion en curso ni prometer resultados. \
-Si recuerda algo nuevo, responda a este mensaje. Gracias por su paciencia.";
+/// Plain-English status-update drafts used when no victim_liaison run is recorded.
+/// Several wordings so cases do not all read the same; picked per case id, so a case
+/// always shows the same draft (stable demo takes). No suspects, leads or promises.
+const VICTIM_TEMPLATES_EN: [&str; 5] = [
+    "Thank you for reporting the burglary at {PLACE}. Your report is on file as case {ID}, and a property crimes detective will review it. \
+We are not able to share details of an open investigation, but we will contact you if we need more information. \
+If you remember anything new, such as serial numbers, receipts or photos of the stolen items, reply to this message and include your case number.",
+    "We are sorry this happened to you. Your burglary report for {PLACE} has been received and assigned case number {ID}. \
+A detective will review it. If you find more information about what was taken, like a model or serial number, \
+please send it in with your case number so we can add it to the file.",
+    "This is a follow-up on your report, case {ID}. Your report about {PLACE} has been reviewed and is now with our property crimes unit. \
+We cannot promise an outcome, but we will reach out if we have questions. \
+If anything else turns up missing, or a neighbor mentions camera footage, please let us know and reference {ID}.",
+    "Thank you for your patience. Case {ID}, your report of a break-in at {PLACE}, is open and will be reviewed by a detective. \
+If you have proof of ownership for any stolen item, such as a receipt, box or photo showing the serial number, please keep it in a safe place. \
+You can add new information at any time by replying with your case number.",
+    "Your burglary report ({ID}) for {PLACE} is on file. A detective will review the details you gave, and we will reach out if we have questions. \
+We know this is stressful. If you think of anything new, including times you were away or anything unusual you noticed, \
+reply to this message with your case number.",
+];
+
+/// FNV-1a over the case id: a fixed, version-independent choice of template.
+fn template_index(id: &str) -> usize {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in id.bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    (h % VICTIM_TEMPLATES_EN.len() as u64) as usize
+}
+
+/// "42XX BLOCK OF FREMONT AVE N" -> "the 42XX block of Fremont Ave N".
+fn place_phrase(block: &str) -> String {
+    const UPPER: [&str; 9] = ["N", "S", "E", "W", "NE", "NW", "SE", "SW", "SLU"];
+    let words: Vec<String> = block
+        .split_whitespace()
+        .map(|w| {
+            if w.contains("XX") || UPPER.contains(&w) {
+                w.to_string()
+            } else if w.eq_ignore_ascii_case("block") || w.eq_ignore_ascii_case("of") {
+                w.to_ascii_lowercase()
+            } else {
+                let lower = w.to_ascii_lowercase();
+                let mut c = lower.chars();
+                c.next().map(|f| f.to_ascii_uppercase().to_string() + c.as_str()).unwrap_or_default()
+            }
+        })
+        .collect();
+    if words.is_empty() { "your home".to_string() } else { format!("the {}", words.join(" ")) }
+}
+
+fn victim_template(c: &Case) -> String {
+    VICTIM_TEMPLATES_EN[template_index(&c.id)].replace("{ID}", &c.id).replace("{PLACE}", &place_phrase(&c.block))
+}
 
 /// Deterministic checklist used when no triage run is recorded. Every step is a suggestion.
 fn engine_steps(c: &Case, series: Option<&String>, matches: &[PropertyMatch]) -> Vec<Value> {
@@ -259,7 +309,7 @@ pub fn build_case(app: &App, id: &str) -> Option<Value> {
         "series_id": series,
         "recorded": recorded,
         "next_steps": steps,
-        "victim_template": {"language": "es", "message": VICTIM_TEMPLATE_ES.replace("{ID}", id), "source": "engine_template"},
+        "victim_template": {"language": "en", "message": victim_template(c), "source": "engine_template"},
     }))
 }
 
@@ -768,9 +818,25 @@ mod tests {
         );
         assert!(v["recorded"].as_object().unwrap().contains_key("triage"));
         assert!(!v["next_steps"].as_array().unwrap().is_empty());
-        assert_eq!(v["victim_template"]["language"], "es");
+        assert_eq!(v["victim_template"]["language"], "en");
+        let msg = v["victim_template"]["message"].as_str().unwrap();
+        assert!(msg.contains(v["case"]["id"].as_str().unwrap()) && !msg.contains("{PLACE}") && !msg.contains("{ID}"));
         assert!(v["similar"].as_array().unwrap().len() <= 5);
         assert!(build_case(a, "CC-NOPE").is_none());
+    }
+
+    #[test]
+    fn victim_templates_vary_and_stay_stable() {
+        let ids: Vec<String> = (1960..2000).map(|n| format!("CC-26-{n:06}")).collect();
+        let picks: HashSet<usize> = ids.iter().map(|i| template_index(i)).collect();
+        assert!(picks.len() >= 3, "templates should vary across cases: {picks:?}");
+        assert_eq!(place_phrase("42XX BLOCK OF FREMONT AVE N"), "the 42XX block of Fremont Ave N");
+        assert_eq!(place_phrase("11XX BLOCK OF NW 58TH ST"), "the 11XX block of NW 58th St");
+        assert_eq!(place_phrase(""), "your home");
+        for t in VICTIM_TEMPLATES_EN {
+            assert!(t.contains("{ID}") && t.contains("{PLACE}"));
+            assert!(!t.contains('\'') && !t.contains('\u{2014}'), "no contractions or em dashes");
+        }
     }
 
     #[test]
