@@ -297,16 +297,16 @@ svg.series-timeline text { font-size: 12px; fill: #344d60; }
 .report-lead { max-width: 58ch; font-size: clamp(24px, 2vw, 32px); }
 .case-switcher { right: 40px; }
 .topbar { gap: 24px; padding: 0 40px; }
-.topbar .actions { order: 0; margin-left: 16px; }
+.topbar .actions { order: 2; margin-left: 0; }
 .topbar .demo-label { order: 1; margin-left: auto; }
 .topbar .actions .btn { min-height: 42px; padding: 9px 18px; font-size: 14px; border-color: #becbd5; }
 .queue-filters { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 16px 16px; }
 .queue-filters button { padding: 7px 9px; border: 1px solid #cbd6df; border-radius: 8px; background: #fff; color: #435b6d; font-size: 12px; }
 .queue-filters button[aria-pressed=true] { background: #283f51; color: #fff; border-color: #283f51; font-weight: 600; }
-.drawer { left: max(24px, calc(50vw - 420px)); right: auto; width: min(560px, calc(100vw - 48px)); }
+.drawer { left: auto; right: 24px; width: min(560px, calc(100vw - 48px)); }
 .drawer.wide { width: min(850px, calc(100vw - 48px)); }
 @media (max-width: 1100px) { .case-body { grid-template-columns: 1fr; } .grid { padding: 0 24px; } .case { min-height: 0; } .case-switcher { right: 24px; } }
-@media (max-width: 650px) { .topbar { padding: 12px 16px; gap: 12px; } .topbar .actions { margin-left: 0; width: auto; } .topbar .demo-label { width: 100%; margin-left: 0; } .grid { padding: 0 14px; } .case { padding: 20px; } .case-switcher { left: 14px; right: auto; } .globe-stage { height: 320px; } }
+@media (max-width: 650px) { .topbar { padding: 12px 16px; gap: 12px; } .topbar .actions { margin-left: auto; width: auto; } .topbar .demo-label { width: 100%; margin-left: 0; } .grid { padding: 0 14px; } .case { padding: 20px; } .case-switcher { left: 14px; right: auto; } .globe-stage { height: 320px; } }
 
 .rejection-form { flex-basis: 100%; min-width: 0; margin: 12px 0 0; padding: 20px; border: 1px solid #d5dfe8; border-radius: 16px; background: #f3f7fbd9; }
 .rejection-form legend { font-size: 15px; font-weight: 650; padding: 0 7px; color: #344b5d; }
