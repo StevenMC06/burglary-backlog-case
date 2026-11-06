@@ -82,5 +82,5 @@ A1 assumptions table (all scenario inputs) · A2 sources · A3 agent cards (inst
 4. Overnight, an agent proposed that seven burglaries are one offender: rear sliding doors, pried open midday, laptops and jewelry.
 5. Then the rules engine checks it, like a referee. One case is ruled out: same time, nine kilometres away. Nobody can be in two places at once.
 6. The detective gets a lead packet where every claim links back to a record, plus a to-do list they can accept, or reject with a reason.
-7. Nothing happens without a person: assignments, alerts, even a Spanish update to the victim. Every click lands in a tamper-evident audit log.
+7. Nothing happens without a person: assignments, alerts, even a status update to the victim. Every click lands in a tamper-evident audit log.
 8. AI suggests. The engine verifies. People decide.
