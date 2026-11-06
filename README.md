@@ -1,19 +1,28 @@
-# Casefile: Team 6, ESEC case comp (Cascade City burglary backlog)
+# Cracking the Burglary Backlog — Team 6
 
-AI that helps property-crimes detectives connect burglaries: it links cases, matches stolen items against pawn records, and hands over a verified, cited lead packet. **AI suggests, a rules engine verifies, people decide.**
+Working space for research, financial assumptions, and a synthetic-data prototype. The final deliverable is a presentation; use Google Slides for collaborative slide editing and put its link below.
 
-All data is synthetic (fictional Cascade City) on public Seattle geography. There is no facial recognition and no names.
+## Logistics
+- Deck: Friday, November 6, 2026, 1:00 PM Pacific, per Daniel's email. PDF or Google Slides link; under 10 slides.
+- Pitch: 3:03 PM, DEM 004; arrive by 2:53 PM. Seven-minute presentation including demo, three-minute Q&A.
+- Team: Shaurya Agarwal, Steven Carmona, Kevin Pham, Gowrav Shivakumara, Sonny Choi.
+- Slides link: TBD
 
-```sh
-cargo run -- cost      # cost & clearance scenarios on the official case baseline
-cargo run -- datagen   # regenerate the synthetic dataset (deterministic)
-cargo run -- serve     # web console at http://localhost:8080 (offline replay of recorded AI runs)
-cargo run -- mcp       # MCP server (stdio) for Claude Code / Claude Desktop
-cargo test             # engine + app tests
-```
+## Start here
+1. Read [the brief](brief.md) and [workshop notes](research/workshop-notes.md).
+2. Choose one bottleneck. Video review is a starting hypothesis, not a settled recommendation.
+3. Assign an owner to research, economics, prototype, ethics/pilot, and presentation coordination.
+4. Record sources in [the evidence log](research/sources.md); calculate benefits in [the model](analysis/model.md).
+5. Build the story using [the slide outline](slides/outline.md).
 
-Docs:
-- [docs/CASE_OFFICIAL.md](docs/CASE_OFFICIAL.md): the case, rubric and judges
-- [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md): architecture and contracts
-- [docs/PROPOSAL.md](docs/PROPOSAL.md): original research proposal (numbers superseded by the official baseline)
-- [docs/GUY_NOTES.md](docs/GUY_NOTES.md): technical judge notes
+## Working rules
+Public or synthetic data only. No facial recognition. Humans make decisions affecting people. Do not commit credentials, real police data, personal email, or sensitive records.
+Case facts, external evidence, workshop observations, and assumptions must be labeled separately. AI output is not evidence by itself.
+Discord is for discussion and research updates; accepted findings and calculations belong here. No Discord integration is installed yet.
+
+## Casefile prototype (Option C, recorded in #decisions)
+Rust workspace: case linkage plus pawn/serial matching, detective-approved next steps. Synthetic data only.
+- Run: `cargo run -- serve` then http://localhost:8080 (details in [docs/CASEFILE_README.md](docs/CASEFILE_README.md))
+- Deck PDF, demo video, eval report, cost results: `deliverables/`
+- Numbers: `cargo run -- cost` (base 9.4% net, +262 clearances; we miss both targets and say so). Read `docs/EVIDENCE_AND_REVIEW.md` before changing any claim.
+- UI lives in `ui/`; deck builder is `tools/deck/build_deck.py`. Algo speed work continues on branch `algo-optimization`.
