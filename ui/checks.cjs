@@ -25,7 +25,7 @@ const context = vm.createContext({ document, setTimeout() {}, clearTimeout() {} 
 const script = fs.readFileSync(__dirname + '/app.js', 'utf8');
 assert.match(script, /\nmain\(\);\s*$/);
 vm.runInContext(script.replace(/\nmain\(\);\s*$/, ''), context);
-const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem, showEvidence, activityItem, readableReport })', context);
+const app = vm.runInContext('({ S, renderQueue, selectCase, stepItem, showEvidence, activityItem, readableReport, pendingSteps, renderPacket, renderVictim })', context);
 function find(node, text) {
   if (node.tag === 'button' && node.textContent === text) return node;
   for (const child of node.children || []) { const result = find(child, text); if (result) return result; }
@@ -41,6 +41,20 @@ module.exports = (async () => {
   assert.equal(elements.get('queue-list').children.length, 0);
   assert.equal(elements.get('queue-empty').hidden, false);
 
+  app.S.queue.cases.push({ id: 'pawn', neighborhood: 'FREMONT', block: '1XX', flags: { pawn_hit: 'exact_serial_lead' } }, { id: 'linked', neighborhood: 'BALLARD', block: '2XX', flags: { series_id: 'S-1' } });
+  document.getElementById('queue-search').value = '';
+  elements.get('queue-filter-pawn').onclick();
+  assert.equal(elements.get('queue-list').children.length, 1);
+  assert.ok(elements.get('queue-list').textContent.includes('pawn'));
+  document.getElementById('queue-search').value = 'ballard';
+  app.renderQueue();
+  assert.equal(elements.get('queue-list').children.length, 0, 'Search and lead filter must combine');
+  elements.get('queue-filter-related').onclick();
+  assert.equal(elements.get('queue-list').children.length, 1);
+  assert.ok(elements.get('queue-list').textContent.includes('linked'));
+  elements.get('queue-filter-all').onclick();
+  document.getElementById('queue-search').value = '';
+
   app.showEvidence('property');
   assert.equal(elements.get('evidence-property').hidden, false);
   assert.equal(elements.get('evidence-report').hidden, true);
@@ -55,6 +69,11 @@ module.exports = (async () => {
   assert.ok(event.textContent.includes('Review serial'));
   assert.ok(!event.textContent.includes('recommendation'), 'Activity must not expose raw JSON field names');
 
+  elements.get('tab-packet').onkeydown({ key: 'End', preventDefault() {} });
+  assert.equal(elements.get('tab-victim').attrs['aria-selected'], 'true', 'End must select the final review tab');
+  elements.get('tab-victim').onkeydown({ key: 'Home', preventDefault() {} });
+  assert.equal(elements.get('tab-packet').attrs['aria-selected'], 'true', 'Home must select the first review tab');
+
   const pending = new Map();
   context.fetch = path => new Promise(resolve => pending.set(path, resolve));
   const data = id => ({ case: { id, status: { kind: 'open' }, block: '42XX BLOCK', neighborhood: 'FREMONT', beat: 'B2', narrative: 'Report' }, solvability: { score: 50, contributions: [] }, recorded: {}, pawn: [], similar: [], next_steps: [], victim_template: { message: 'Draft' } });
@@ -68,6 +87,12 @@ module.exports = (async () => {
   assert.equal(elements.get('case-switcher').open, false, 'Selecting a case must close the switcher');
   assert.equal(elements.get('selected-case-label').textContent, 'second');
 
+  app.S.current.recorded.victim_liaison = { output: { language: 'es', message: 'Estimado residente' } };
+  app.S.current.victim_template = { language: 'en', message: 'Your report has been received.' };
+  app.renderVictim();
+  assert.ok(elements.get('pane-victim').textContent.includes('Your report has been received.'));
+  assert.ok(!elements.get('pane-victim').textContent.includes('Estimado'));
+
   const step = { step: 'Review record', why: 'Serial lead', lawful_basis_note: 'Internal review', est_minutes: 10, source: 'triage' };
   const disclosure = app.stepItem(step, 0, app.S.current);
   const details = disclosure.children[0].children.find(n => n.tag === 'details');
@@ -79,11 +104,33 @@ module.exports = (async () => {
   assert.equal(app.S.decided['second#0'], undefined, 'A failed save must not show Accepted');
   assert.equal(find(failed, 'Accept').disabled, false, 'A failed save must allow retry');
   await find(failed, 'Reject').onclick();
-  await find(failed, 'Confirm reject').onclick();
+  await find(failed, 'Not available').onclick();
+  await find(failed, 'Cancel').onclick();
+  const rejectionForm = failed.children[1].children.find(n => n.tag === 'fieldset');
+  assert.equal(rejectionForm.hidden, true, 'Cancel must hide the form without saving');
+  assert.equal(app.S.decided['second#0'], undefined);
+  await find(failed, 'Reject').onclick();
+  assert.equal(rejectionForm.hidden, false);
+  await find(failed, 'Confirm rejection').onclick();
   assert.equal(app.S.decided['second#0'], undefined, 'A failed save must not show Rejected');
 
   context.fetch = async path => ({ ok: true, json: async () => path === '/api/audit' ? { chain: { intact: true, entries: 1 }, entries: [] } : { entry: { seq: 1 } } });
   await find(failed, 'Accept').onclick();
   assert.equal(app.S.decided['second#0'].kind, 'accepted');
+  const progression = { case: { id: 'second' }, next_steps: [step, { ...step, step: 'Second action' }, { ...step, step: 'Third action' }] };
+  assert.equal(app.pendingSteps(progression)[0].index, 1, 'Accepted action must advance to next pending item');
+  app.S.current = { ...app.S.current, ...progression };
+  app.renderPacket();
+  const featured = () => elements.get('pane-packet').children.find(n => n.className === 'steps featured-step');
+  assert.ok(featured().textContent.includes('Second action'), 'Next action must render without opening a disclosure');
+  app.S.decided['second#1'] = { kind: 'rejected', reason: 'Other' };
+  assert.equal(app.pendingSteps(progression)[0].index, 2, 'Rejected action must advance too');
+  app.renderPacket();
+  assert.ok(featured().textContent.includes('Third action'));
+  app.S.decided['second#2'] = { kind: 'accepted' };
+  assert.equal(app.pendingSteps(progression).length, 0, 'All reviewed must leave no pending action');
+  app.renderPacket();
+  assert.equal(featured(), undefined);
+  assert.ok(elements.get('pane-packet').textContent.includes('All actions reviewed'));
   console.log('UI checks passed: search, empty results, selection race, failed decisions, retry.');
 })();

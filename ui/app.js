@@ -52,7 +52,7 @@ function fill(el, ...kids) {
   el.replaceChildren(...kids.flat(2).filter((k) => k != null && k !== false).map((k) => (k.nodeType ? k : document.createTextNode(String(k)))));
 }
 
-const S = { queue: null, current: null, series: null, kpi: null, team: null, seriesPick: null, decided: {} };
+const S = { queue: null, current: null, series: null, kpi: null, team: null, seriesPick: null, queueFilter: "all", decided: {} };
 
 // ---------------------------------------------------------------- KPI strip
 function renderKpi() {
@@ -78,8 +78,10 @@ function renderKpi() {
 function renderQueue() {
   const q = S.queue;
   const query = $("queue-search").value.trim().toLowerCase();
-  const cases = q.cases.filter((c) => `${c.id} ${c.neighborhood} ${c.block}`.toLowerCase().includes(query));
-  $("queue-count").textContent = query ? `${cases.length}/${q.cases.length}` : q.cases.length;
+  const matchesFilter = c => S.queueFilter === "pawn" ? c.flags.pawn_hit === "exact_serial_lead" : S.queueFilter === "related" ? !!c.flags.series_id : true;
+  const cases = q.cases.filter(c => matchesFilter(c) && `${c.id} ${c.neighborhood} ${c.block}`.toLowerCase().includes(query));
+  ["all", "pawn", "related"].forEach(filter => $("queue-filter-" + filter).setAttribute("aria-pressed", String(S.queueFilter === filter)));
+  $("queue-count").textContent = query || S.queueFilter !== "all" ? `${cases.length}/${q.cases.length}` : q.cases.length;
   $("queue-empty").hidden = cases.length > 0;
   const ul = $("queue-list");
   ul.replaceChildren(
@@ -101,6 +103,9 @@ function renderQueue() {
   };
 }
 $("queue-search").oninput = () => { if (S.queue) renderQueue(); };
+["all", "pawn", "related"].forEach(filter => {
+  $("queue-filter-" + filter).onclick = () => { S.queueFilter = filter; if (S.queue) renderQueue(); };
+});
 function markCurrent() {
   document.querySelectorAll(".qbtn").forEach((b) => b.setAttribute("aria-current", String(b.dataset.id === S.current?.case.id)));
   globalThis.CasefileMotion?.select(S.current?.case.id);
@@ -132,7 +137,7 @@ function pawnCard(p) {
       h("div", {}, h("span", { class: "kv" }, "Pawn serial"), h("span", { class: "mono" }, p.pawn?.serial || "Not recorded"))),
     p.pawn ? h("div", { class: "kv" }, p.pawn.dealer) : null,
     h("details", { class: "step-details" }, h("summary", {}, "Match details"), h("p", {}, m.reason),
-      st === "exact_serial_lead" ? h("p", {}, "Ownership unverified. Seller is not presumed to be the offender.") : null));
+      st === "exact_serial_lead" ? h("p", {}, h("strong", {}, "Ownership unverified. "), "Seller is not presumed to be the offender.") : null));
 }
 function readableReport(narrative) {
   const terms = [[/\bRP\b/g, "Reporting person"], [/\bUNK SUSP\(s\)/gi, "Unknown suspect(s)"], [/\bUNK SUSP\b/gi, "Unknown suspect"], [/\bUNK\b/g, "unknown"], [/\bPOE\b/g, "Entry point"], [/\bFD\b/g, "front door"], [/\bRESD\b/g, "Residential"], [/\bSTOR UNIT B&E\b/g, "Storage unit break-in"], [/\brpt'd\b/g, "reported"], [/\bS\/N\b/g, "serial"], [/\bEst\./g, "Estimated"], [/\bSusp\b/g, "Suspect"], [/\bveh\b/g, "vehicle"], [/\bdk\b/g, "dark"]];
@@ -215,7 +220,7 @@ async function decide(action, subject, detail) {
 function stepItem(st, i, d) {
   const key = `${d.case.id}#${i}`;
   const done = S.decided[key];
-  const li = h("li", { class: "step " + (done ? done.kind : "") });
+  const li = h("li", { class: "step " + (done ? done.kind : ""), "data-step": String(i + 1).padStart(2, "0") });
   const body = h("div", {}, h("div", { class: "step-title" }, st.step),
     h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
       h("p", { class: "full-step" }, st.step), h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
@@ -224,40 +229,71 @@ function stepItem(st, i, d) {
   if (done) {
     btns.append(h("span", { class: "chip " + (done.kind === "accepted" ? "pass" : "fail") }, done.kind === "accepted" ? "Accepted" : "Rejected: " + done.reason));
   } else {
-    const sel = h("select", { "aria-label": "Reject reason", hidden: true }, REASONS.map((r) => h("option", { value: r }, r)));
-    const note = h("input", { type: "text", "aria-label": "Reject note", placeholder: "note (optional)", hidden: true, size: "14" });
-    const confirm = h("button", { type: "button", class: "btn sm danger", hidden: true }, "Confirm reject");
+    let reason = REASONS[0];
+    const reasonLabel = h("span", {}, reason);
+    const picker = h("details", { class: "reason-picker" });
+    const trigger = h("summary", { "aria-label": "Rejection reason" }, reasonLabel, h("span", { "aria-hidden": "true" }, "⌄"));
+    const options = REASONS.map(value => h("button", { type: "button", class: "reason-option", "aria-pressed": String(value === reason), onclick: () => {
+      reason = value; reasonLabel.textContent = value; picker.open = false;
+      options.forEach(button => button.setAttribute("aria-pressed", String(button.textContent === value)));
+      trigger.focus();
+    } }, value));
+    const menu = h("div", { class: "reason-menu", role: "group", "aria-label": "Rejection reasons" }, options);
+    picker.append(trigger, menu);
+    picker.ontoggle = () => { if (picker.open) globalThis.CasefileMotion?.reveal(menu, -5); };
+    menu.onkeydown = e => {
+      if (e.key === "Escape") { picker.open = false; trigger.focus(); e.preventDefault(); return; }
+      const index = options.indexOf(document.activeElement);
+      const next = e.key === "ArrowDown" ? (index + 1) % options.length : e.key === "ArrowUp" ? (index - 1 + options.length) % options.length : e.key === "Home" ? 0 : e.key === "End" ? options.length - 1 : null;
+      if (next != null) { e.preventDefault(); options[next].focus(); }
+    };
+    const note = h("textarea", { "aria-label": "Rejection notes", placeholder: "Add context for the team…", maxlength: "200", rows: "3" });
+    const confirm = h("button", { type: "button", class: "btn sm danger" }, "Confirm rejection");
     const accept = h("button", { type: "button", class: "btn sm primary" }, "Accept");
     const reject = h("button", { type: "button", class: "btn sm" }, "Reject");
+    const cancel = h("button", { type: "button", class: "btn sm" }, "Cancel");
+    const form = h("fieldset", { class: "rejection-form", hidden: true },
+      h("legend", {}, "Reject this action"), h("div", { class: "field-label" }, "Reason"), picker,
+      h("label", {}, h("span", { class: "field-label" }, "Notes ", h("span", { class: "muted" }, "(optional · 200 characters)")), note),
+      h("div", { class: "rejection-controls" }, cancel, confirm));
+    cancel.onclick = () => { form.hidden = true; picker.open = false; reject.hidden = false; reject.focus(); };
+
     accept.onclick = async () => {
-      accept.disabled = reject.disabled = true;
+      accept.disabled = reject.disabled = form.disabled = true;
       try {
         await decide("accept_step", d.case.id, { step: st.step, source: st.source });
         S.decided[key] = { kind: "accepted" }; renderPacket();
-      } catch (e) { toast(e.message); accept.disabled = reject.disabled = false; }
+      } catch (e) { toast(e.message); accept.disabled = reject.disabled = form.disabled = false; }
     };
-    reject.onclick = () => { sel.hidden = note.hidden = confirm.hidden = false; reject.hidden = true; sel.focus(); };
+    reject.onclick = () => { form.hidden = false; reject.hidden = true; globalThis.CasefileMotion?.reveal(form); trigger.focus(); };
     confirm.onclick = async () => {
-      confirm.disabled = accept.disabled = true;
+      form.disabled = confirm.disabled = accept.disabled = true;
       try {
-        await decide("reject_step", d.case.id, { step: st.step, reason: sel.value, note: note.value.slice(0, 200), source: st.source });
-        S.decided[key] = { kind: "rejected", reason: sel.value }; renderPacket();
-      } catch (e) { toast(e.message); confirm.disabled = accept.disabled = false; }
+        await decide("reject_step", d.case.id, { step: st.step, reason, note: note.value.slice(0, 200), source: st.source });
+        S.decided[key] = { kind: "rejected", reason }; renderPacket();
+      } catch (e) { toast(e.message); form.disabled = confirm.disabled = accept.disabled = false; }
     };
-    btns.append(accept, reject, sel, note, confirm);
+    btns.append(accept, reject, form);
   }
   li.append(btns);
   return li;
 }
+function pendingSteps(d) {
+  return d.next_steps.map((step, index) => ({ step, index })).filter(({ index }) => !S.decided[`${d.case.id}#${index}`]);
+}
 function renderPacket() {
   const d = S.current, pane = $("pane-packet");
   const pk = d.recorded.packet_writer, tr = d.recorded.triage;
+  const pending = pendingSteps(d);
+  const completed = d.next_steps.map((step, index) => ({ step, index })).filter(({ index }) => S.decided[`${d.case.id}#${index}`]);
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${pending.length} remaining`)),
     tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
-    h("ul", { class: "steps featured-step" }, d.next_steps.slice(0, 1).map((s, i) => stepItem(s, i, d))),
-    d.next_steps.length > 1 ? h("details", { class: "more-actions" }, h("summary", {}, `${d.next_steps.length - 1} more actions`),
-      h("ul", { class: "steps remaining-steps" }, d.next_steps.slice(1).map((s, i) => stepItem(s, i + 1, d)))) : null,
+    pending.length ? h("ul", { class: "steps featured-step", "aria-live": "polite" }, stepItem(pending[0].step, pending[0].index, d)) : h("p", { class: "complete-status", role: "status" }, "All actions reviewed"),
+    pending.length > 1 ? h("details", { class: "more-actions" }, h("summary", {}, `${pending.length - 1} upcoming actions`),
+      h("ul", { class: "steps" }, pending.slice(1).map(({ step, index }) => stepItem(step, index, d)))) : null,
+    completed.length ? h("details", { class: "more-actions" }, h("summary", {}, `${completed.length} reviewed`),
+      h("ul", { class: "steps" }, completed.map(({ step, index }) => stepItem(step, index, d)))) : null,
     h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
     pk ? [h("div", { class: "row-flex" }, pk.output.citations_ok ? null : h("span", { class: "chip weak" }, "Citations need review"),
         h("span", { class: "kv" }, `${pk.model} · $${pk.cost_usd.toFixed(3)} · ${(pk.duration_ms / 1000).toFixed(0)}s`),
@@ -286,7 +322,7 @@ function pickSeries() {
   return list.find((s) => s.id === S.seriesPick) || list.find((s) => s.in_queue.includes(id)) || list[0];
 }
 function mapSvg(ser) {
-  const W = 440, H = 190, P = 22;
+  const W = 440, H = 250, P = 32;
   const pts = ser.cases.map((c) => ({ id: c.id, x: c.location.lon * Math.cos((c.location.lat * Math.PI) / 180), y: -c.location.lat, c }));
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -294,33 +330,36 @@ function mapSvg(ser) {
   const px = (p) => P + (p.x - x0) * sc + (W - 2 * P - (x1 - x0) * sc) / 2;
   const py = (p) => P + (p.y - y0) * sc + (H - 2 * P - (y1 - y0) * sc) / 2;
   const off = new Set(ser.verify.offending_cases);
-  const sorted = [...pts].sort((a, b) => a.c.window_start - b.c.window_start);
-  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Map of ${pts.length} cases in ${ser.id}, no map tiles` });
-  el.append(svg("polyline", { points: sorted.map((p) => `${px(p)},${py(p)}`).join(" "), fill: "none", stroke: "#7b8696", "stroke-dasharray": "3 3" }));
+  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "series-map", role: "img", "aria-label": `Schematic locations of ${pts.length} cases in ${ser.id}. Nearby points are grouped. No map tiles.` });
+  const groups = [];
   for (const p of pts) {
-    const q = ser.in_queue.includes(p.id), bad = off.has(p.id), cl = ser.cleared?.case_id === p.id;
-    const g = svg("g", {}, svg("title", {}, `${p.id} ${p.c.block}`),
-      svg("circle", { cx: px(p), cy: py(p), r: q ? 6 : 4.5, fill: bad ? "#9c1c1c" : q ? "#1d4f91" : "#6b7f99", stroke: cl ? "#155c33" : "#fff", "stroke-width": cl ? 3 : 1.5 }),
-      svg("text", { x: px(p) + (px(p) > W - 70 ? -8 : 8), y: py(p) + 3, "text-anchor": px(p) > W - 70 ? "end" : "start" }, shortId(p.id)));
-    el.append(g);
+    const x = px(p), y = py(p);
+    const group = groups.find(g => Math.hypot(g.x - x, g.y - y) < 28);
+    if (group) group.points.push(p); else groups.push({ x, y, points: [p] });
+  }
+  for (const g of groups) {
+    const bad = g.points.some(p => off.has(p.id));
+    const queued = g.points.some(p => ser.in_queue.includes(p.id));
+    el.append(svg("g", {}, svg("title", {}, g.points.map(p => p.id).join(", ")),
+      svg("circle", { cx: g.x, cy: g.y, r: g.points.length > 1 ? 13 : 8, fill: bad ? "#8b2435" : queued ? "#173b63" : "#6b7d89", stroke: "#fff", "stroke-width": 3 }),
+      g.points.length > 1 ? svg("text", { x: g.x, y: g.y + 4, "text-anchor": "middle", style: "fill:white;font-size:12px;font-weight:600" }, g.points.length) : null));
   }
   return el;
 }
 function timelineSvg(ser) {
-  const W = 440, H = 52, P = 16;
-  const cs = ser.cases;
-  const t0 = Math.min(...cs.map((c) => c.window_start)), t1 = Math.max(...cs.map((c) => c.window_end));
-  const x = (t) => P + ((t - t0) / Math.max(1, t1 - t0)) * (W - 2 * P);
-  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Timeline of offense windows" });
-  el.append(svg("line", { x1: P, x2: W - P, y1: 26, y2: 26, stroke: "#7b8696" }));
-  const sorted = [...cs].sort((a, b) => a.window_start - b.window_start);
+  const W = 440, P = 16, label = 126;
+  const sorted = [...ser.cases].sort((a, b) => a.window_start - b.window_start);
+  const H = sorted.length * 36 + 44;
+  const t0 = Math.min(...sorted.map(c => c.window_start)), t1 = Math.max(...sorted.map(c => c.window_end));
+  const x = t => label + ((t - t0) / Math.max(1, t1 - t0)) * (W - label - P);
+  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "series-timeline", role: "img", "aria-label": "Offense windows, one case per row" });
   sorted.forEach((c, i) => {
-    const w = Math.max(3, x(c.window_end) - x(c.window_start));
-    el.append(svg("rect", { x: x(c.window_start), y: 20, width: w, height: 12, fill: ser.in_queue.includes(c.id) ? "#1d4f91" : "#6b7f99" }, svg("title", {}, `${c.id} ${fmtTime(c.window_start)}`)));
-    if (ser.in_queue.includes(c.id) || ser.cleared?.case_id === c.id)
-      el.append(svg("text", { x: Math.min(x(c.window_start), W - 40), y: 14 }, shortId(c.id).slice(-4) + (ser.cleared?.case_id === c.id ? " cleared" : " queue")));
+    const y = 22 + i * 36;
+    el.append(svg("text", { x: P, y: y + 4 }, c.id.slice(-6)),
+      svg("line", { x1: label, x2: W - P, y1: y, y2: y, stroke: "#e0e5e8" }),
+      svg("rect", { x: x(c.window_start), y: y - 5, width: Math.max(4, x(c.window_end) - x(c.window_start)), height: 10, rx: 4, fill: ser.in_queue.includes(c.id) ? "#173b63" : "#84939d" }, svg("title", {}, `${c.id}: ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)));
   });
-  el.append(svg("text", { x: P, y: H - 3 }, fmtTime(t0)), svg("text", { x: W - P, y: H - 3, "text-anchor": "end" }, fmtTime(t1)));
+  el.append(svg("text", { x: label, y: H - 8 }, fmtTime(t0)), svg("text", { x: W - P, y: H - 8, "text-anchor": "end" }, fmtTime(t1)));
   return el;
 }
 function renderSeries() {
@@ -344,11 +383,13 @@ function renderSeries() {
   };
   fill(pane, 
     h("div", { class: "row-flex" }, sel),
-    h("div", { class: "kv" }, ser.rationale),
+    h("details", { class: "disclosure" }, h("summary", {}, "Why these cases?"), h("p", { class: "series-copy" }, ser.rationale)),
     ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
-    mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
+    h("h3", {}, "Locations"), mapSvg(ser), h("p", { class: "map-key" }, "Navy: inbox · Burgundy: conflict · Numbers group nearby cases"),
+    h("details", { class: "disclosure" }, h("summary", {}, "Cases and offense windows"), timelineSvg(ser),
+      h("ul", { class: "series-case-list" }, ser.cases.map(c => h("li", {}, h("button", { type: "button", class: "linkbtn", onclick: () => selectCase(c.id) }, c.id), h("span", { class: "kv" }, human(c.neighborhood)))))),
     h("h3", {}, "Link checks"),
-    h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
+    h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("details", { class: "check-reason" }, h("summary", {}, "Reason"), h("p", { class: "series-copy" }, c.reason))))),
     h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
       ser.skeptic && sk ? h("p", { class: "kv" }, sk.reasons_with_citations) : missing("the independent review")),
     h("div", { class: "row-flex" }, approve),
@@ -359,9 +400,10 @@ function renderSeries() {
 // ---------------------------------------------------------------- right: victim
 function renderVictim() {
   const d = S.current, pane = $("pane-victim");
-  const rec = d.recorded.victim_liaison;
+  const saved = d.recorded.victim_liaison;
+  const rec = saved?.output.language?.toLowerCase() === "en" ? saved : null;
   const msg = rec ? rec.output.message : d.victim_template.message;
-  const lang = rec ? rec.output.language : "es";
+  const lang = "en";
   const key = "victim:" + d.case.id;
   const done = S.decided[key];
   const btn = h("button", { type: "button", class: "btn primary", disabled: !!done }, done ? "Approved" : "Approve update");
@@ -377,7 +419,7 @@ function renderVictim() {
     rec ? null : h("p", { class: "kv" }, "Standard template · No recorded draft"),
     h("div", { class: "packet-text", lang: lang }, msg),
     rec?.output.plain_english_summary ? h("div", { class: "kv" }, "English summary: " + rec.output.plain_english_summary) : null,
-    h("div", { class: "kv" }, "Approval is recorded. Delivery is not connected."),
+    h("div", { class: "kv" }, h("strong", {}, "Approval only. "), "Delivery is not connected."),
     h("div", { class: "row-flex" }, btn)
   );
 }
@@ -425,6 +467,7 @@ function renderTeam() {
 }
 function openDrawer(id) {
   for (const d of document.querySelectorAll(".drawer")) d.hidden = d.id !== id ? true : !d.hidden;
+  globalThis.CasefileMotion?.drawers();
   const d = $(id);
   if (!d.hidden) d.querySelector("[data-close]").focus();
 }
@@ -466,8 +509,9 @@ function showTab(name) {
 TABS.forEach((t, i) => {
   $("tab-" + t).onclick = () => showTab(t);
   $("tab-" + t).onkeydown = (e) => {
-    const n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : null;
+    const n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
     if (n == null) return;
+    e.preventDefault();
     const to = TABS[(n + TABS.length) % TABS.length];
     showTab(to); $("tab-" + to).focus();
   };
@@ -486,6 +530,7 @@ async function selectCase(id) {
   $("selected-case-label").textContent = id;
   $("case-switcher").open = false;
   markCurrent(); renderCase(); renderPacket(); renderSeries(); renderVictim();
+  globalThis.CasefileMotion?.caseTransition();
   $("case-card").scrollTop = 0;
   document.querySelectorAll(".pane").forEach((p) => { p.scrollTop = 0; });
 }

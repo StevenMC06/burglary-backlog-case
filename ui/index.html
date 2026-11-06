@@ -24,6 +24,11 @@
   <nav class="col queue" aria-label="Overnight queue">
     <div class="queue-head"><h2>Inbox <span id="queue-count" class="count"></span></h2><span class="muted">Overnight</span></div>
     <input id="queue-search" type="search" placeholder="Search cases" aria-label="Search cases by ID or location" autocomplete="off">
+    <div class="queue-filters" role="group" aria-label="Filter cases">
+      <button type="button" id="queue-filter-all" aria-pressed="true">All</button>
+      <button type="button" id="queue-filter-pawn" aria-pressed="false">Pawn leads</button>
+      <button type="button" id="queue-filter-related" aria-pressed="false">Related series</button>
+    </div>
     <ul id="queue-list" class="queue-list"></ul>
     <p id="queue-empty" class="empty" hidden>No cases found.</p>
   </nav>

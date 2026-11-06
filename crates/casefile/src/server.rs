@@ -176,10 +176,10 @@ fn run_json(r: &RecordedRun) -> Value {
     })
 }
 
-const VICTIM_TEMPLATE_ES: &str = "Estimado/a residente: su denuncia {ID} fue recibida y revisada por nuestro equipo. \
-Un detective tiene el caso y le avisaremos cuando haya novedades que podamos compartir. \
-No podemos dar detalles de la investigacion en curso ni prometer resultados. \
-Si recuerda algo nuevo, responda a este mensaje. Gracias por su paciencia.";
+const VICTIM_TEMPLATE_EN: &str = "Your burglary report {ID} has been received and reviewed. \
+A detective is reviewing the case. We will contact you when there is information we can share. \
+We cannot disclose details of the ongoing investigation or promise an outcome. \
+If you remember anything else, please contact the burglary unit and reference your case number. Thank you for your patience.";
 
 /// Deterministic checklist used when no triage run is recorded. Every step is a suggestion.
 fn engine_steps(c: &Case, series: Option<&String>, matches: &[PropertyMatch]) -> Vec<Value> {
@@ -259,7 +259,7 @@ pub fn build_case(app: &App, id: &str) -> Option<Value> {
         "series_id": series,
         "recorded": recorded,
         "next_steps": steps,
-        "victim_template": {"language": "es", "message": VICTIM_TEMPLATE_ES.replace("{ID}", id), "source": "engine_template"},
+        "victim_template": {"language": "en", "message": VICTIM_TEMPLATE_EN.replace("{ID}", id), "source": "engine_template"},
     }))
 }
 
@@ -768,7 +768,7 @@ mod tests {
         );
         assert!(v["recorded"].as_object().unwrap().contains_key("triage"));
         assert!(!v["next_steps"].as_array().unwrap().is_empty());
-        assert_eq!(v["victim_template"]["language"], "es");
+        assert_eq!(v["victim_template"]["language"], "en");
         assert!(v["similar"].as_array().unwrap().len() <= 5);
         assert!(build_case(a, "CC-NOPE").is_none());
     }
