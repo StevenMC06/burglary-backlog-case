@@ -166,6 +166,10 @@ pub struct ProposeClustersParams {
     /// Edge threshold on the 0..1 pair score (default 0.9). Higher is stricter and returns fewer,
     /// tighter groups.
     pub threshold: Option<f64>,
+    /// Only return clusters that contain this case. Use it whenever you work on one case: the
+    /// unfiltered list can be 60 clusters long.
+    #[serde(default)]
+    pub case_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -567,12 +571,18 @@ impl CasefileServer {
             return Err(format!("threshold must be between 0 and 1, got {t}"));
         }
         let all = self.clusters(t)?;
-        let mut sorted: Vec<&SeriesHypothesis> = all.iter().collect();
+        let only = match p.case_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(id) => Some(self.need_case(id)?.id.clone()),
+            None => None,
+        };
+        let mut sorted: Vec<&SeriesHypothesis> =
+            all.iter().filter(|h| only.as_ref().is_none_or(|id| h.case_ids.contains(id))).collect();
         sorted.sort_by(|a, b| b.case_ids.len().cmp(&a.case_ids.len()).then_with(|| a.id.cmp(&b.id)));
         let shown: Vec<&&SeriesHypothesis> = sorted.iter().take(MAX_CLUSTERS_RETURNED).collect();
         to_text(&json!({
             "threshold": t,
             "total_clusters": all.len(),
+            "case_id": only,
             "returned": shown.len(),
             "clusters": shown,
         }))

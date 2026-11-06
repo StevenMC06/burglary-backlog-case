@@ -103,6 +103,13 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         }
         eprintln!("bench: k={k} done");
     }
+    writeln!(md, "\nPair funnel on the seed dataset (k=1): how many pairs each stage of propose_clusters still has to look at.\n")?;
+    writeln!(md, "| threshold | all pairs | in 180-day window | in 30 km box | pass upper bound | edges |")?;
+    writeln!(md, "|---|---|---|---|---|---|")?;
+    for th in [0.5, 0.9] {
+        let f = linkage::pair_funnel(&base, th);
+        writeln!(md, "| {th} | {} | {} | {} | {} | {} |", f[0], f[1], f[2], f[3], f[4])?;
+    }
     writeln!(
         md,
         "\nWhy it is faster, with no change to results:\n\

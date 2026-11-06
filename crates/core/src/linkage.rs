@@ -687,6 +687,56 @@ impl<'a> Prepared<'a> {
     }
 }
 
+/// How many pairs survive each stage of [`propose_clusters`] at `threshold`:
+/// `[all pairs, inside the time window, inside the box, pass the upper bound, edges]`.
+/// For explaining and benchmarking only; single-threaded.
+#[doc(hidden)]
+pub fn pair_funnel(ds: &Dataset, threshold: f64) -> [usize; 5] {
+    let mut sorted: Vec<&Case> = ds.cases.iter().collect();
+    sorted.sort_by(|a, b| a.id.cmp(&b.id));
+    let n = sorted.len();
+    let prep = Prepared::new(&sorted);
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| prep.mid[a].total_cmp(&prep.mid[b]).then(a.cmp(&b)));
+    let mut f = [n * n.saturating_sub(1) / 2, 0, 0, 0, 0];
+    for p in 0..n {
+        let a = order[p];
+        for &b in &order[p + 1..] {
+            if (prep.mid[b] - prep.mid[a]) / SECS_PER_DAY > MAX_LINK_DAYS {
+                break;
+            }
+            f[1] += 1;
+            let (i, j) = if a < b { (a, b) } else { (b, a) };
+            let (pa, pb) = (sorted[i].location, sorted[j].location);
+            let dlat = (pa.lat - pb.lat).abs() * 111.2;
+            let dlon = (pa.lon - pb.lon).abs() * 111.2 * (((pa.lat + pb.lat) / 2.0).to_radians()).cos().abs();
+            if dlat > MAX_LINK_KM || dlon > MAX_LINK_KM {
+                continue;
+            }
+            f[2] += 1;
+            let max_shared = match (&prep.mo[i], &prep.mo[j]) {
+                (Some(x), Some(y)) => x.sigs.len().min(y.sigs.len()),
+                _ => 0,
+            };
+            let (distance_km, days_apart) = (haversine_km(pa, pb), (prep.mid[i] - prep.mid[j]).abs() / SECS_PER_DAY);
+            let bound = score_from_components(
+                &PairComponents { mo_similarity: 1.0, distance_km, days_apart, shared_signatures: max_shared },
+                true,
+            );
+            if bound < threshold {
+                continue;
+            }
+            f[3] += 1;
+            let (mo_similarity, shared_signatures) = prep.mo_sim(i, j).unwrap_or((0.0, 0));
+            let c = PairComponents { mo_similarity, distance_km, days_apart, shared_signatures };
+            if score_from_components(&c, prep.mo[i].is_some() && prep.mo[j].is_some()) >= threshold {
+                f[4] += 1;
+            }
+        }
+    }
+    f
+}
+
 /// Brute-force reference for [`propose_clusters`]: every pair inside the time/box prefilter goes
 /// through [`pair_score`]. Oracle for tests and `casefile bench`.
 #[doc(hidden)]
@@ -1172,6 +1222,15 @@ mod tests {
                 assert_eq!(propose_clusters(&ds, t), propose_clusters_reference(&ds, t), "n={n} seed={seed} t={t}");
             }
         }
+    }
+
+    #[test]
+    fn pair_funnel_narrows_and_counts_edges() {
+        let ds = fuzz_dataset(400, 2);
+        let f = pair_funnel(&ds, 0.5);
+        assert_eq!(f[0], 400 * 399 / 2);
+        assert!(f.windows(2).all(|w| w[0] >= w[1]), "{f:?}");
+        assert!(f[4] > 0, "fuzz data should produce some edges: {f:?}");
     }
 
     #[test]
