@@ -46,10 +46,10 @@ impl Store {
         // Overlay extracted MOs from recorded extractor runs.
         for run in Self::runs_in(root, "extractor") {
             let mo = run.output.get("mo").cloned().unwrap_or_default();
-            if let Ok(mo) = serde_json::from_value::<Mo>(mo) {
-                if let Some(c) = ds.cases.iter_mut().find(|c| c.id == run.input_id) {
-                    c.mo = Some(mo);
-                }
+            if let Ok(mo) = serde_json::from_value::<Mo>(mo)
+                && let Some(c) = ds.cases.iter_mut().find(|c| c.id == run.input_id)
+            {
+                c.mo = Some(mo);
             }
         }
         Ok(Self { root: root.to_path_buf(), ds, truth })
@@ -62,10 +62,10 @@ impl Store {
             let mut paths: Vec<_> = rd.filter_map(|e| e.ok().map(|e| e.path())).collect();
             paths.sort();
             for p in paths {
-                if p.extension().is_some_and(|e| e == "json") {
-                    if let Some(r) = std::fs::read(&p).ok().and_then(|b| serde_json::from_slice(&b).ok()) {
-                        out.push(r);
-                    }
+                if p.extension().is_some_and(|e| e == "json")
+                    && let Some(r) = std::fs::read(&p).ok().and_then(|b| serde_json::from_slice(&b).ok())
+                {
+                    out.push(r);
                 }
             }
         }
