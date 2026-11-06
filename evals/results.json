@@ -133,7 +133,7 @@
     }
   ],
   "decoys_rejected": 10,
-  "extraction_runs": 0,
+  "extraction_runs": 12,
   "property": {
     "conflicts_rejected": 83588,
     "exact_correct": 100,
@@ -143,19 +143,19 @@
     "truth_resurfaced": 116
   },
   "series_pruned": {
-    "f1": 0.7891317188422918,
-    "precision": 0.6568338249754179,
-    "predicted_pairs": 1017,
-    "recall": 0.9881656804733728,
+    "f1": 0.7929411764705883,
+    "precision": 0.658203125,
+    "predicted_pairs": 1024,
+    "recall": 0.9970414201183432,
     "series_recovered": 38,
     "series_total": 40,
     "true_pairs": 676
   },
   "series_raw": {
-    "f1": 0.7709174841315638,
-    "precision": 0.6319772942289499,
-    "predicted_pairs": 1057,
-    "recall": 0.9881656804733728,
+    "f1": 0.774712643678161,
+    "precision": 0.6334586466165414,
+    "predicted_pairs": 1064,
+    "recall": 0.9970414201183432,
     "series_recovered": 38,
     "series_total": 40,
     "true_pairs": 676
@@ -172,8 +172,16 @@
         "true_pairs": 4
       },
       "cases": 20,
-      "llm_decoy_pairs_accepted": null,
-      "llm_only": null,
+      "llm_decoy_pairs_accepted": 0,
+      "llm_only": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "predicted_pairs": 4,
+        "recall": 1.0,
+        "series_recovered": 4,
+        "series_total": 4,
+        "true_pairs": 4
+      },
       "subset": "n20"
     },
     {
@@ -187,8 +195,16 @@
         "true_pairs": 13
       },
       "cases": 60,
-      "llm_decoy_pairs_accepted": null,
-      "llm_only": null,
+      "llm_decoy_pairs_accepted": 6,
+      "llm_only": {
+        "f1": 0.6666666666666667,
+        "precision": 0.55,
+        "predicted_pairs": 20,
+        "recall": 0.8461538461538461,
+        "series_recovered": 11,
+        "series_total": 13,
+        "true_pairs": 13
+      },
       "subset": "n60"
     },
     {
@@ -202,8 +218,16 @@
         "true_pairs": 74
       },
       "cases": 150,
-      "llm_decoy_pairs_accepted": null,
-      "llm_only": null,
+      "llm_decoy_pairs_accepted": 9,
+      "llm_only": {
+        "f1": 0.8571428571428571,
+        "precision": 0.7931034482758621,
+        "predicted_pairs": 87,
+        "recall": 0.9324324324324325,
+        "series_recovered": 18,
+        "series_total": 24,
+        "true_pairs": 74
+      },
       "subset": "n150"
     }
   ]

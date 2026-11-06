@@ -9,6 +9,7 @@ import glob
 import html
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -65,6 +66,12 @@ for w in wall:
     )
 sp = ev["series_pruned"]
 prop = ev["property"]
+_rep = open(os.path.join(ROOT, "evals", "report.md"), encoding="utf-8").read()
+_m = re.search(r"\| time_band \| (\d+)% \((\d+)/(\d+)\)", _rep)
+extract_line = (
+    f"Extractor ({ev['extraction_runs']} recorded runs): entry, premise, weekday 100%; time band only {_m.group(1)}% (wide windows are ambiguous; a human confirms)."
+    if _m else ""
+)
 
 screens = os.path.join(ROOT, "docs", "deck", "ui.png")
 screen_tag = '<img class="shot" src="ui.png">' if os.path.exists(screens) else '<div class="shot ph">UI screenshot</div>'
@@ -150,9 +157,9 @@ slides.append(slide(5, "Architecture", "AI proposes. The engine verifies. A dete
 <div class="ok" style="font-size:16px">Approvals never block: requests queue with a ticket and escalate after 120 min, so human review waits hours, not days.</div></div>
 <div><h2>Single LLM vs. proposer + verifier (our eval)</h2>
 <table><tr><th>Cases</th><th>LLM only F1</th><th>Casefile F1</th><th>Decoy pairs accepted by LLM</th></tr>{wall_rows}</table>
-<p class="small">Planted series with decoys, synthetic ground truth. Casefile = engine clusters + verify_series pruning.</p>
+<p class="small">Planted series with decoys, synthetic ground truth, one run per size. The LLM matches us on F1 at small scale; what it lacks is the hard check: it accepted decoy pairs that one person cannot have committed, and 150 cases already cost about 53k input tokens (2,000 would be about 0.7M, over one context window).</p>
 <h2 style="margin-top:12px">Full 2,000-case run</h2>
-<p class="small">Series pairs: precision {pct(sp['precision'],0)}, recall {pct(sp['recall'],0)}, {sp['series_recovered']}/{sp['series_total']} planted series recovered. Decoys rejected: {ev['decoys_rejected']}/{len(ev['decoys'])}. Exact-serial leads: {prop['exact_correct']}/{prop['exact_leads']} correct.</p></div></div>"""))
+<p class="small">Series pairs: precision {pct(sp['precision'],0)}, recall {pct(sp['recall'],0)}, {sp['series_recovered']}/{sp['series_total']} planted series recovered. Decoys rejected: {ev['decoys_rejected']}/{len(ev['decoys'])}. Exact-serial leads: {prop['exact_correct']}/{prop['exact_leads']} correct. {extract_line}</p></div></div>"""))
 
 slides.append(slide(6, "Cost-benefit on the official baseline", f"Base case: {pct(B['steady_net_pct'])} net, short of the 15% target", f"""
 <div class="cols"><div>

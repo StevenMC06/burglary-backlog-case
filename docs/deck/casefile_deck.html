@@ -58,10 +58,10 @@ th { color: #0f6b73; font-size: 14px; text-transform: uppercase; letter-spacing:
 <span class="tag o">Channels</span><p class="small">Sergeant console · detective packet · victim message draft (any language, staff-approved). Not built: patrol hands-free brief.</p>
 <div class="ok" style="font-size:16px">Approvals never block: requests queue with a ticket and escalate after 120 min, so human review waits hours, not days.</div></div>
 <div><h2>Single LLM vs. proposer + verifier (our eval)</h2>
-<table><tr><th>Cases</th><th>LLM only F1</th><th>Casefile F1</th><th>Decoy pairs accepted by LLM</th></tr><tr><td>20</td><td>not recorded</td><td><b>80%</b></td><td>-</td></tr><tr><td>60</td><td>not recorded</td><td><b>69%</b></td><td>-</td></tr><tr><td>150</td><td>not recorded</td><td><b>86%</b></td><td>-</td></tr></table>
-<p class="small">Planted series with decoys, synthetic ground truth. Casefile = engine clusters + verify_series pruning.</p>
+<table><tr><th>Cases</th><th>LLM only F1</th><th>Casefile F1</th><th>Decoy pairs accepted by LLM</th></tr><tr><td>20</td><td>100%</td><td><b>80%</b></td><td>0</td></tr><tr><td>60</td><td>67%</td><td><b>69%</b></td><td>6</td></tr><tr><td>150</td><td>86%</td><td><b>86%</b></td><td>9</td></tr></table>
+<p class="small">Planted series with decoys, synthetic ground truth, one run per size. The LLM matches us on F1 at small scale; what it lacks is the hard check: it accepted decoy pairs that one person cannot have committed, and 150 cases already cost about 53k input tokens (2,000 would be about 0.7M, over one context window).</p>
 <h2 style="margin-top:12px">Full 2,000-case run</h2>
-<p class="small">Series pairs: precision 66%, recall 99%, 38/40 planted series recovered. Decoys rejected: 10/10. Exact-serial leads: 100/100 correct.</p></div></div>
+<p class="small">Series pairs: precision 66%, recall 100%, 38/40 planted series recovered. Decoys rejected: 10/10. Exact-serial leads: 100/100 correct. Extractor (12 recorded runs): entry, premise, weekday 100%; time band only 58% (wide windows are ambiguous; a human confirms).</p></div></div>
 <div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>5 / 9</span></div></section><section class="slide"><div class="kick">Cost-benefit on the official baseline</div><h1>Base case: 9.4% net, short of the 15% target</h1>
 <div class="cols"><div>
 <div class="big">$285k</div><div class="lab">net per year, 9.4% of $3.05M (target 15% = $457.5k)</div>
@@ -97,7 +97,7 @@ th { color: #0f6b73; font-size: 14px; text-transform: uppercase; letter-spacing:
 <li><b>Privacy:</b> CJIS-approved hosting; only data the department lawfully holds; no facial recognition.</li>
 <li><b>False positives:</b> skeptic agent plus rules engine rejected 10/10 decoy series; a serial match is a lead, not ownership.</li>
 <li><b>Human in the loop:</b> no send, assign or alert action exists without a click; hash-chained audit log; replays give identical output.</li></ul></div>
-<div><h2>Measured inference cost (recorded runs)</h2><table><tr><th>Agent</th><th>Model</th><th>$/run</th><th>n</th></tr><tr><td>extractor</td><td>haiku</td><td>$0.002</td><td>8</td></tr></table>
+<div><h2>Measured inference cost (recorded runs)</h2><table><tr><th>Agent</th><th>Model</th><th>$/run</th><th>n</th></tr><tr><td>extractor</td><td>haiku</td><td>$0.002</td><td>12</td></tr><tr><td>triage</td><td>sonnet</td><td>$0.036</td><td>4</td></tr><tr><td>series_hunter</td><td>sonnet</td><td>$0.078</td><td>1</td></tr><tr><td>skeptic</td><td>opus</td><td>$0.176</td><td>1</td></tr><tr><td>packet_writer</td><td>sonnet</td><td>$0.063</td><td>2</td></tr><tr><td>victim_liaison</td><td>haiku</td><td>$0.002</td><td>1</td></tr><tr><td>series_llm_only</td><td>opus</td><td>$0.266</td><td>3</td></tr></table>
 <p class="small">Right-sized models: the cheapest adequate model per task.</p></div></div>
 <div class="ok" style="font-size:22px"><b>Ask:</b> approve a 90-day, one-precinct pilot; scale only if the gates pass. Full program: $130k setup, $62k/yr to run.</div>
 <div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>9 / 9</span></div></section></body></html>
