@@ -1,0 +1,9 @@
+/target
+**/target
+*.log
+/media/raw/
+/media/tmp/
+.venv/
+__pycache__/
+*.pyc
+.env

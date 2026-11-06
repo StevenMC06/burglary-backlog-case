@@ -1,0 +1,30 @@
+# Solution/evidence stream
+
+## Recommendation
+Pilot **video evidence triage with source-linked human verification**, not autonomous suspect identification. Use motion/event detection and indexed timestamps to shortlist portions of existing lawfully acquired footage; retain originals, expose uncertainty, require officer verification of original clips, create an evidence packet containing source file/timestamp plus human notes. Search neutral attributes/events (vehicle entering driveway, package moved), never faces, protected traits, or inferred criminal intent. No new camera network or predictive patrol allocation.
+
+Video review is largest task by time: 120 officer minutes/case; $1M/year in fictional baseline. Detective analysis is highest by labor cost: 90 detective minutes, $1.05M/year. Neither is automatically the binding clearance constraint. Pick video because the workflow is measurable and a narrow synthetic prototype can show source references; reserve case linkage for a later phase unless trial data support it.
+
+## Primary sources and permissible claims
+1. Adams et al., published Oct 2 2024, *No man's hand: artificial intelligence does not improve police report writing speed*. https://link.springer.com/article/10.1007/s11292-024-09644-7
+   Preregistered RCT: 85 officers and 755 reports. No statistically significant report-duration effect. The main estimate was -29.66 minutes, SE 39.62, wide uncertainty; do not present that estimate as a saving. Single agency/tool/context; does not prove every AI tool is ineffective. Supports measuring end-to-end workflow including confirmation and data entry.
+2. Ashby 2017, *The value of CCTV surveillance cameras as an investigative tool*. Author's university repository: https://irep.ntu.ac.uk/id/eprint/30588/ ; article DOI https://doi.org/10.1007/s10610-017-9341-6
+   251,195 British Transport Police crimes, 2011-2015. CCTV available 45%, useful in 29% of all cases, 65% of available-footage cases. Useful CCTV associated with solving. Observational railway study, not American residential burglary and not AI evaluation. Use to motivate evidence retrieval, NOT to forecast 25% AI clearance uplift or transfer its coverage figures to Cascade City.
+3. Dowling et al., Australian Institute of Criminology 2019, *How do police use CCTV footage in criminal investigations?* https://www.aic.gov.au/sites/default/files/2020-05/ti575_how_do_police_use_cctv_footage_in_criminal_investigations.pdf
+   Structured interviews with 146 NSW officers who requested rail CCTV. One-third encountered quality/coverage problems. Selected sample, officer-reported, rail-specific. Supports quality/coverage checks and a manual fallback; not a causal efficacy estimate.
+4. Porter 2014, *A Statistical Approach to Crime Linkage*. https://arxiv.org/abs/1410.2285
+   Research model on solved/unsolved breaking-and-entering data: 82% of actual pairwise links at 5% false-positive rate; 77%-89% additional series crimes in top 50 ranked incidents. Retrospective analytical performance, NOT proof of increased operational clearance or calibrated suspect probabilities. Large all-pairs candidate spaces can create many false leads; avoid making linkage the MVP.
+5. College of Policing burglary guidance: https://www.college.police.uk/guidance/residential-burglary/further-investigation
+   Search result supports gathering doorbell/dashcam evidence and route footage; page fetch returned 403 so do not claim full guidance was read. Optional lead only, not needed in slides if sources 1-4 suffice.
+
+## Clearance mechanism — threshold, not forecast
+Target: 1,625 cleared cases vs 1,300 baseline = 325 additional.
+Equation: net new actionable leads (cases that would otherwise remain uncleared) × completed-follow-up fraction × incremental clearance conversion = additional cleared cases. Deduplicate linked cases and exclude leads already found manually.
+Illustrative required pipeline: 1,000 net new lead-bearing cases × 65% follow-up completion × 50% incremental clearance conversion = 325. Every conversion is an unproven target assumption. Follow-up workload must be costed separately; saved officer time is not automatically detective capacity. If only 500 net new lead cases, same conversion yields ~163 additional, clearance ~14.63%.
+More realistic presentation: promise a controlled pilot and a target pathway; do not claim 16.25% as proven forecast. Track original and AI-found leads, adjudication, follow-up completion, and clearance with a consistent observation window/control group.
+
+## What is unknown
+No verified independent causal source found establishing that this proposed AI video workflow saves 75% review time or increases burglary clearance by 25%. Baseline table is a fictional allocation, not empirical proof every burglary has footage. Pilot must determine eligible case coverage, adoption, net review time, missed-event rate, false-positive burden, and actual clearance differences.
+
+## Suggested slide line
+“Buy a measured reduction in evidence-review work; earn the clearance claim through a controlled pilot.”

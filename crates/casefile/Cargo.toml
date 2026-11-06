@@ -1,0 +1,22 @@
+[package]
+name = "casefile"
+description = "Casefile binary: datagen, MCP server, agent recorder, web console, evals, cost model CLI."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "casefile"
+path = "src/main.rs"
+
+[dependencies]
+casefile-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs"] }
+rmcp = { version = "3.9", features = ["server", "macros", "transport-io"] }
+schemars = "1"
+sha2 = "0.10"
+anyhow = "1"

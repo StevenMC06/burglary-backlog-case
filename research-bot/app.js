@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {computeMetrics,packet,INITIAL}=require('./app.js');
+const events=INITIAL.map(e=>({...e,decision:'accepted'}));
+assert.deepEqual(computeMetrics(events),{truePositives:1,falsePositives:1,falseNegatives:1,recall:.5,precision:.5});
+events[1].decision='rejected';
+events.push({id:'HUM-1',time:35,label:'Parcel movement',origin:'human-observation',truthId:'GT-2',decision:'accepted'});
+assert.equal(computeMetrics(events).recall,1);
+assert.equal(computeMetrics(events).falsePositives,0);
+const p=packet(events,[{action:'rejected',eventId:'SUG-2'}],45);
+assert.equal(p.acceptedEvents.length,2);
+assert.ok(!p.acceptedEvents.some(e=>e.id==='SUG-2'));
+assert.equal(p.acceptedEvents[1].sourceId,'SYN-CAM-01');
+assert.equal(p.acceptedEvents[1].time,35);
+assert.ok(!('truthId' in p.acceptedEvents[1]));
+assert.equal(p.reviewAudit[0].eventId,'SUG-2');
+assert.equal(p.fixture.liveInference,false);
+console.log('PASS: planted error detection, correction, rejection filtering, source provenance, audit preservation, fixture disclosure.');

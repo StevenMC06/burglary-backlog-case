@@ -1,0 +1,33 @@
+{
+  "_comment": "Base config for the ESEC Assistant. install_context.py fills guild_id, ask_channel_id, channels and ledger_path and writes ~/.esec-discord-context/esec-assistant.json; setup_assistant.ps1 -ConfigTemplate uses that file. No secrets here.",
+  "guild_id": "",
+  "ask_channel_id": "",
+  "github_repo": "",
+  "assistant_name": "ESEC Assistant",
+  "project_name": "ESEC case comp",
+  "project_about": "ESEC case competition team (Team 6). Case: improving burglary investigations for the Cascade City Police Department; technical judge Guy Ernest (AI-on-Cloud). Check Discord for confirmed logistics (deadlines, pitch slot) rather than assuming them.",
+  "digest_channels": [
+    "general"
+  ],
+  "status_channels": [
+    "decisions",
+    "resource",
+    "general"
+  ],
+  "model": "anthropic/claude-haiku-5.5",
+  "deep_model": "anthropic/claude-sonnet-5.5",
+  "deep_enabled": true,
+  "budget_usd": 5.0,
+  "max_questions_per_user_per_hour": 15,
+  "max_question_chars": 1000,
+  "max_output_tokens": 4096,
+  "deep_max_output_tokens": 8192,
+  "reasoning_effort": "medium",
+  "deep_reasoning_effort": "high",
+  "max_tool_rounds": 6,
+  "context_minutes": 15,
+  "tool_result_max_chars": 12000,
+  "ledger_path": "~/.esec-discord-context/team-decisions.md",
+  "log_content": false,
+  "team_protocol": "Case Comp Research (bot id 1568109550358241361) is the team's Codex research agent; it posts research, proposals and numbers with sources in #resource and #general. Treat its posts as proposals, not decisions. A proposal is a team decision only when it is recorded in #decisions or at least two human teammates explicitly agree (replies or approving reactions); say which proposals are still waiting. #decisions is authoritative over older chat. Your own earlier replies in #ask-bot are not sources. Meeting transcripts and other files are attachments (mostly in #resource): use list_resources and read_attachment before saying something isn't recorded."
+}

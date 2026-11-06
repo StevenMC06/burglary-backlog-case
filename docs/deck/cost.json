@@ -1,0 +1,248 @@
+{
+  "baseline": {
+    "annual_labor": 3050000.0,
+    "cases": 10000.0,
+    "clearance_target_additional": 325.0,
+    "cost_target": 457500.0,
+    "detective_rate": 70.0,
+    "officer_rate": 50.0
+  },
+  "results": [
+    {
+      "additional_clearances": 74.58,
+      "adopted_cases": 7000.0,
+      "clearance_rate": 0.137458,
+      "detective_hours_saved": 2391.6666666666665,
+      "followup_cost": 62748.00000000001,
+      "followup_hours": 896.4000000000001,
+      "gross_capacity_value": 196583.3333333333,
+      "leads_from_linkage": 312.0,
+      "leads_from_property": 125.99999999999999,
+      "leads_from_triage": 60.0,
+      "meets_clearance_target": false,
+      "meets_cost_target": false,
+      "new_leads": 498.0,
+      "officer_hours_saved": 583.3333333333334,
+      "one_time_cost": 160000.0,
+      "payback_years": 5.2890325310908795,
+      "recurring_cost": 85000.0,
+      "scenario": "Conservative",
+      "steady_net": 48835.33333333331,
+      "steady_net_pct": 0.016011584699453543,
+      "year_one_net": -209456.33333333334,
+      "year_one_roi": -0.6806098929427107
+    },
+    {
+      "additional_clearances": 315.8125,
+      "adopted_cases": 8500.0,
+      "clearance_rate": 0.16158125,
+      "detective_hours_saved": 5100.0,
+      "followup_cost": 91227.5,
+      "followup_hours": 1303.25,
+      "gross_capacity_value": 427833.3333333334,
+      "leads_from_linkage": 585.0,
+      "leads_from_property": 297.5,
+      "leads_from_triage": 120.0,
+      "meets_clearance_target": false,
+      "meets_cost_target": false,
+      "new_leads": 1002.5,
+      "officer_hours_saved": 1416.6666666666667,
+      "one_time_cost": 130000.0,
+      "payback_years": 1.018702564584996,
+      "recurring_cost": 62000.0,
+      "scenario": "Base",
+      "steady_net": 274605.8333333334,
+      "steady_net_pct": 0.09003469945355193,
+      "year_one_net": -5135.833333333314,
+      "year_one_roi": -0.018133243888158155
+    },
+    {
+      "additional_clearances": 498.74999999999994,
+      "adopted_cases": 9500.0,
+      "clearance_rate": 0.179875,
+      "detective_hours_saved": 7600.0,
+      "followup_cost": 139649.99999999997,
+      "followup_hours": 1994.9999999999998,
+      "gross_capacity_value": 650750.0,
+      "leads_from_linkage": 818.9999999999999,
+      "leads_from_property": 456.0,
+      "leads_from_triage": 150.0,
+      "meets_clearance_target": true,
+      "meets_cost_target": true,
+      "new_leads": 1425.0,
+      "officer_hours_saved": 2375.0,
+      "one_time_cost": 110000.0,
+      "payback_years": 0.3686172663678633,
+      "recurring_cost": 50000.0,
+      "scenario": "Optimistic",
+      "steady_net": 461100.0,
+      "steady_net_pct": 0.15118032786885247,
+      "year_one_net": 188412.5,
+      "year_one_roi": 0.628775237777407
+    }
+  ],
+  "scenarios": [
+    {
+      "adoption": 0.7,
+      "completion": 0.6,
+      "conversion": 0.35,
+      "evidence_min_saved": 5.0,
+      "followup_hours": 3.0,
+      "link_hit_rate": 0.2,
+      "linked_open_per_hit": 1.2,
+      "name": "Conservative",
+      "one_time": [
+        {
+          "name": "RMS + pawn-feed integration",
+          "usd": 80000.0
+        },
+        {
+          "name": "Security & CJIS review",
+          "usd": 30000.0
+        },
+        {
+          "name": "Ground-truth evaluation set",
+          "usd": 30000.0
+        },
+        {
+          "name": "Training & change management",
+          "usd": 20000.0
+        }
+      ],
+      "packet_min_saved": 10.0,
+      "recurring": [
+        {
+          "name": "Model inference + hosting (CJIS-aligned cloud)",
+          "usd": 30000.0
+        },
+        {
+          "name": "Integration & support",
+          "usd": 30000.0
+        },
+        {
+          "name": "Security / audit",
+          "usd": 15000.0
+        },
+        {
+          "name": "Ongoing evaluation & training",
+          "usd": 10000.0
+        }
+      ],
+      "resurface_rate": 0.06,
+      "screened_detective_min": 45.0,
+      "screened_share": 0.3,
+      "screening_clearance_loss": 30.0,
+      "traceable_share": 0.3,
+      "triage_leads": 60.0,
+      "year_one_ramp": 0.5
+    },
+    {
+      "adoption": 0.85,
+      "completion": 0.65,
+      "conversion": 0.5,
+      "evidence_min_saved": 10.0,
+      "followup_hours": 2.0,
+      "link_hit_rate": 0.3,
+      "linked_open_per_hit": 1.5,
+      "name": "Base",
+      "one_time": [
+        {
+          "name": "RMS + pawn-feed integration",
+          "usd": 60000.0
+        },
+        {
+          "name": "Security & CJIS review",
+          "usd": 25000.0
+        },
+        {
+          "name": "Ground-truth evaluation set",
+          "usd": 25000.0
+        },
+        {
+          "name": "Training & change management",
+          "usd": 20000.0
+        }
+      ],
+      "packet_min_saved": 20.0,
+      "recurring": [
+        {
+          "name": "Model inference + hosting (CJIS-aligned cloud)",
+          "usd": 12000.0
+        },
+        {
+          "name": "Integration & support",
+          "usd": 25000.0
+        },
+        {
+          "name": "Security / audit",
+          "usd": 15000.0
+        },
+        {
+          "name": "Ongoing evaluation & training",
+          "usd": 10000.0
+        }
+      ],
+      "resurface_rate": 0.1,
+      "screened_detective_min": 30.0,
+      "screened_share": 0.4,
+      "screening_clearance_loss": 10.0,
+      "traceable_share": 0.35,
+      "triage_leads": 120.0,
+      "year_one_ramp": 0.65
+    },
+    {
+      "adoption": 0.95,
+      "completion": 0.7,
+      "conversion": 0.5,
+      "evidence_min_saved": 15.0,
+      "followup_hours": 2.0,
+      "link_hit_rate": 0.35,
+      "linked_open_per_hit": 1.8,
+      "name": "Optimistic",
+      "one_time": [
+        {
+          "name": "RMS + pawn-feed integration",
+          "usd": 50000.0
+        },
+        {
+          "name": "Security & CJIS review",
+          "usd": 20000.0
+        },
+        {
+          "name": "Ground-truth evaluation set",
+          "usd": 20000.0
+        },
+        {
+          "name": "Training & change management",
+          "usd": 20000.0
+        }
+      ],
+      "packet_min_saved": 30.0,
+      "recurring": [
+        {
+          "name": "Model inference + hosting (CJIS-aligned cloud)",
+          "usd": 10000.0
+        },
+        {
+          "name": "Integration & support",
+          "usd": 20000.0
+        },
+        {
+          "name": "Security / audit",
+          "usd": 12000.0
+        },
+        {
+          "name": "Ongoing evaluation & training",
+          "usd": 8000.0
+        }
+      ],
+      "resurface_rate": 0.12,
+      "screened_detective_min": 20.0,
+      "screened_share": 0.45,
+      "screening_clearance_loss": 0.0,
+      "traceable_share": 0.4,
+      "triage_leads": 150.0,
+      "year_one_ramp": 0.75
+    }
+  ]
+}

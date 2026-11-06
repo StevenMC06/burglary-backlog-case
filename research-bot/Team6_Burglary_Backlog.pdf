@@ -1,0 +1,21 @@
+# Synthetic Evidence Review — functional prototype
+
+Open index.html in a browser (double-click), or serve this directory with `python3 -m http.server 8091` and visit http://localhost:8091. No network calls, dependencies, API token, or real data are required.
+
+## What actually works
+Play/pause the generated 60-second camera scene; scrub any timestamp; jump to context before suggested events; accept/reject events; add a timestamped human observation; reveal planted evaluation labels; export a JSON evidence packet with source ID, timestamp, scene/fixture version, accepted events and complete decision audit.
+
+This is a synthetic workflow prototype using **precomputed suggestions**, not live AI inference. Do not claim model accuracy, time savings, CJIS compliance, or clearance improvement from it. The scene is deterministic animation, not an uploaded camera video. Final export strips evaluation truth IDs from evidence events.
+
+## 60–90 second recording script
+1. (0–15s) Show the synthetic/precomputed disclosure. Explain source preservation and that suggestions only navigate.
+2. (15–30s) Select “View context” on 00:15, play briefly, then Accept the gate-entry observation. Do not claim unlawful intent or identify a suspect.
+3. (30–45s) View 00:49 context. It is a curtain, not meaningful evidence; Reject it. Show the audit entry.
+4. (45–60s) Scrub the source to 00:35. Parcel movement was missed. Add “Parcel moved from porch; needs contextual investigation” as a human observation.
+5. (60–75s) Reveal ground truth. Fixture began at 50% recall and 50% precision; a human rejected its false positive and recovered its missed event. These are two planted relevant events, not a production benchmark.
+6. (75–90s) Export the packet. Show source IDs/timestamps, human decisions, and disclosure. State that a pilot must test whether full human review plus corrections saves time without missing evidence.
+
+Ground-truth matching for manual observations uses a ±3-second timestamp window; text understanding is not implemented. This is deliberately disclosed evaluation scaffolding, not another model. Reviewer identity is a fixed demo label, not authenticated identity. Audit is in-memory and resettable, not a tamper-proof production log. Export before reset to retain it. Never deploy this as a police evidence system.
+
+## Checks
+Run `node checks.cjs`. Tests cover initial planted miss/false-positive scoring, corrected recall, rejection filtering, preserved source provenance, audit inclusion, and fixture disclosure. Visual/browser inspection still required before recording.

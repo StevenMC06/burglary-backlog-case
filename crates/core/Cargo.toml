@@ -1,0 +1,10 @@
+[package]
+name = "casefile-core"
+description = "Pure, deterministic investigation engine: linkage, series verification, solvability, property matching, citations, cost model. No IO."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

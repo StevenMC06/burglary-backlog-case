@@ -1,0 +1,4 @@
+scenario,eligible_fraction,adoption_fraction,treated_cases,net_minutes_saved_per_treated_case,gross_officer_hours,reserved_officer_hours,gross_labor_value,releasable_labor_value,annual_recurring_cost,one_time_cost,first_year_ramp,steady_net_economic_benefit,steady_net_percent,first_year_net_economic_benefit,first_year_net_percent,first_year_ROI,payback_years_if_after_year1,net_minutes_required_for_steady_target
+Conservative,0.6,0.7,4200.0,40,2800.0,560.0,140000.0,112000.0,195500,180000,0.5,-83500.0,-0.027377049180327868,-319500.0,-0.10475409836065573,-0.8508655126498003,,233.21428571428572
+Base,0.8,0.85,6800.0,60,6800.0,1360.0,340000.0,272000.0,165500,180000,0.65,106500.0,0.034918032786885246,-168700.0,-0.05531147540983607,-0.4882778581765557,2.584037558685446,137.4264705882353
+Optimistic,0.9,0.95,8550.0,90,12825.0,1282.5,641250.0,577125.0,145500,180000,0.75,431625.0,0.14151639344262296,107343.75,0.03519467213114754,0.3297811059907834,,94.03508771929825

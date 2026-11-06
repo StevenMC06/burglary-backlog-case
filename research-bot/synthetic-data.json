@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Synthetic property matching demo; no network, personal data, or identity inference."""
+import argparse
+import html
+import json
+import re
+from difflib import SequenceMatcher
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+def normalize(value):
+    return re.sub(r'[^A-Z0-9]', '', str(value).upper())
+
+def compare(item, listing):
+    a, b = normalize(item.get('serial', '')), normalize(listing.get('serial', ''))
+    base = {'item_id': item['id'], 'listing_id': listing['id'],
+            'source': listing['source'], 'human_decision': 'NOT REVIEWED'}
+    if a and b and a != b:
+        return dict(base, status='REJECTED: conflicting serials', reason='Both records contain different serials; text similarity cannot override the conflict.', score=None)
+    if a and b and a == b:
+        return dict(base, status='EXACT SERIAL LEAD', reason='Normalized serials agree. Human must verify source serial, ownership, and manufacturer/model; no seller identity inference.', score=None)
+    text_a = ' '.join(str(item.get(k, '')) for k in ('brand', 'model', 'description')).lower()
+    text_b = ' '.join(str(listing.get(k, '')) for k in ('brand', 'model', 'description')).lower()
+    similarity = SequenceMatcher(None, text_a, text_b).ratio()
+    same_model = normalize(item.get('model', '')) == normalize(listing.get('model', '')) and bool(item.get('model'))
+    markings_a = {normalize(v) for v in item.get('markings', []) if normalize(v)}
+    markings_b = {normalize(v) for v in listing.get('markings', []) if normalize(v)}
+    overlap = sorted(markings_a & markings_b)
+    if overlap and (similarity >= .35 or same_model):
+        return dict(base, status='REVIEW CANDIDATE: shared marking', reason='Shared synthetic marking: ' + ', '.join(overlap) + '. Marking is not unique proof; corroboration required.', score=round(similarity, 3))
+    if same_model or similarity >= .6:
+        return dict(base, status='UNRESOLVED: similar description only', reason='No corroborating identifier. Same model or similar words do not establish the same physical item.', score=round(similarity, 3))
+    return dict(base, status='NO CANDIDATE', reason='Insufficient shared item evidence.', score=round(similarity, 3))
+
+def run(items, listings):
+    rows = [compare(item, listing) for item in items for listing in listings]
+    priority = {'EXACT SERIAL LEAD': 0, 'REVIEW CANDIDATE: shared marking': 1, 'UNRESOLVED: similar description only': 2, 'REJECTED: conflicting serials': 3, 'NO CANDIDATE': 4}
+    return sorted(rows, key=lambda row: (priority[row['status']], -(row['score'] or 0), row['item_id'], row['listing_id']))
+
+def render(rows):
+    esc = lambda value: html.escape(str(value))
+    tr = ''.join('<tr>' + ''.join('<td>' + esc(row[k]) + '</td>' for k in ('item_id','listing_id','status','reason','source','human_decision')) + '</tr>' for row in rows if row['status'] != 'NO CANDIDATE')
+    return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RecoverLink synthetic demo</title>
+<style>body{font:16px system-ui;margin:32px;max-width:1500px;background:#f4f6f9;color:#142438}h1{margin-bottom:8px}.notice{padding:18px;background:#fff3cf;border-radius:8px}table{table-layout:fixed;border-collapse:collapse;width:100%;background:white;margin-top:24px}th,td{overflow-wrap:anywhere;text-align:left;padding:10px;border-bottom:1px solid #ddd;vertical-align:top}th{background:#142438;color:white}th:nth-child(1),th:nth-child(2){width:8%}th:nth-child(3){width:18%}th:nth-child(4){width:32%}th:nth-child(5){width:18%}th:nth-child(6){width:12%}td:nth-child(3){font-weight:700}small{display:block;margin-top:20px}</style>
+<h1>RecoverLink</h1><p>Property leads with evidence you can inspect</p><div class="notice"><b>SYNTHETIC DEMONSTRATION</b> — All items, serials, and listings are made up. No live marketplaces or personal data. This prototype uses deterministic serial rules and fuzzy text matching, not a trained AI model. Leads are not ownership findings, accusations, arrests, or clearances.</div>
+<table><thead><tr><th>Reported item</th><th>Listing</th><th>Result</th><th>Why / next step</th><th>Source reference</th><th>Human decision</th></tr></thead><tbody>''' + tr + '''</tbody></table><small>Similarity scores are text-ranking aids, not probabilities. No automated contact, hold, seizure, or suspect identification. Human review of original records and corroborating ownership evidence is required.</small></html>'''
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--data', type=Path, default=ROOT/'synthetic-data.json')
+    parser.add_argument('--html', type=Path, help='Write offline report')
+    args=parser.parse_args()
+    data=json.loads(args.data.read_text())
+    rows=run(data['items'],data['listings'])
+    for row in rows:
+        if row['status'] != 'NO CANDIDATE':
+            print(f"{row['item_id']} → {row['listing_id']}: {row['status']}\n  {row['reason']}")
+    if args.html:
+        args.html.write_text(render(rows))
+        print(f'Offline report saved: {args.html}')
+
+if __name__ == '__main__':
+    main()
