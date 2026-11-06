@@ -21,17 +21,32 @@
 </header>
 
 <main class="grid">
+  <details class="case-switcher" id="case-switcher">
+    <summary>Cases <span id="selected-case-label">Browse inbox</span></summary>
   <nav class="col queue" aria-label="Overnight queue">
     <div class="queue-head"><h2>Inbox <span id="queue-count" class="count"></span></h2><span class="muted">Overnight</span></div>
     <input id="queue-search" type="search" placeholder="Search cases" aria-label="Search cases by ID or location" autocomplete="off">
+    <div class="queue-filters" role="group" aria-label="Filter cases">
+      <button type="button" id="queue-filter-all" aria-pressed="true">All</button>
+      <button type="button" id="queue-filter-pawn" aria-pressed="false">Pawn leads</button>
+      <button type="button" id="queue-filter-related" aria-pressed="false">Related series</button>
+    </div>
     <ul id="queue-list" class="queue-list"></ul>
     <p id="queue-empty" class="empty" hidden>No cases found.</p>
   </nav>
+  </details>
 
   <section class="workspace" aria-label="Case workspace">
     <header id="case-heading" class="case-heading" aria-live="polite"><p class="empty">Loading cases…</p></header>
     <div class="case-body">
-    <section class="case" id="case-card" aria-label="Case details"></section>
+    <section class="case" aria-label="Case details">
+      <div class="tabs evidence-tabs" role="tablist" aria-label="Case evidence">
+        <button role="tab" id="evidence-tab-report" aria-controls="evidence-report" aria-selected="true" tabindex="0">Report</button>
+        <button role="tab" id="evidence-tab-property" aria-controls="evidence-property" aria-selected="false" tabindex="-1">Property</button>
+        <button role="tab" id="evidence-tab-related" aria-controls="evidence-related" aria-selected="false" tabindex="-1">Related</button>
+      </div>
+      <div id="case-card"></div>
+    </section>
     <section class="right" aria-label="Case actions">
     <div class="tabs" role="tablist" aria-label="Right panel">
       <button role="tab" id="tab-packet" aria-controls="pane-packet" aria-selected="true" tabindex="0">Next steps</button>
@@ -60,5 +75,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script src="app.js"></script>
+<script type="module" src="motion-ui.js"></script>
 </body>
 </html>
