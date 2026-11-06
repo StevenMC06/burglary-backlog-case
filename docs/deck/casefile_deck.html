@@ -1,0 +1,103 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Casefile</title><style>
+@page { size: 1280px 720px; margin: 0 }
+* { box-sizing: border-box }
+body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; color: #1b2430 }
+.slide { width: 1280px; height: 720px; padding: 44px 64px; page-break-after: always; position: relative; background: #fff; overflow: hidden }
+h1 { font-size: 40px; line-height: 1.12; margin: 0 0 10px; color: #0f2a43 }
+h2 { font-size: 22px; margin: 0 0 8px; color: #0f6b73 }
+p, li { font-size: 20px; line-height: 1.35 }
+ul { margin: 6px 0; padding-left: 22px }
+.sub { font-size: 22px; color: #44566a; margin-bottom: 18px }
+.kick { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: #0f6b73; font-weight: 700; margin-bottom: 6px }
+.foot { position: absolute; bottom: 16px; left: 64px; right: 64px; font-size: 13px; color: #6b7c8f; display: flex; justify-content: space-between }
+.cols { display: flex; gap: 36px } .cols > div { flex: 1 }
+.big { font-size: 54px; font-weight: 800; color: #0f2a43; line-height: 1 }
+.lab { font-size: 14px; color: #55677a }
+.card { border: 1px solid #d5dde6; border-radius: 10px; padding: 14px 18px; background: #f6f9fb }
+.warn { border-left: 6px solid #c2410c; background: #fff4ec; padding: 10px 16px; font-size: 19px; margin-top: 12px }
+.ok { border-left: 6px solid #0f6b73; background: #eaf6f6; padding: 10px 16px; font-size: 19px; margin-top: 12px }
+table { border-collapse: collapse; font-size: 17px } td, th { border-bottom: 1px solid #d5dde6; padding: 6px 12px; text-align: left }
+th { color: #0f6b73; font-size: 14px; text-transform: uppercase; letter-spacing: .06em }
+.tag { display: inline-block; font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: #0f2a43; color: #fff; margin: 0 6px 6px 0 }
+.tag.h { background: #0f6b73 } .tag.s { background: #7a4b00 } .tag.o { background: #5b2a86 }
+.shot { width: 100%; border: 1px solid #c8d2dc; border-radius: 8px } .ph { height: 330px; display: flex; align-items: center; justify-content: center; background: #eef2f6; color: #8493a3 }
+.bar { height: 22px; border-radius: 4px; background: #0f6b73 }
+.small { font-size: 15px; color: #55677a }
+</style></head><body><section class="slide"><div class="kick">Casefile · Stage 6 detective follow-up</div><h1>10,000 burglaries.<br>A few hundred burglars.</h1>
+<p class="sub">Cascade City logged 10,000 burglaries and cleared 1,300 (13%). Casefile connects the cases so detectives can close them.</p>
+<div class="cols" style="margin-top:30px"><div class="card"><h2>AI suggests</h2><p>Agents read reports, hypothesize series, draft packets.</p></div>
+<div class="card"><h2>A rules engine verifies</h2><p>Could one person be at both scenes? Same MO? Serial match? Yes/no with reasons.</p></div>
+<div class="card"><h2>People decide</h2><p>Every assignment, alert and victim message needs a click, recorded in a hash-chained audit log.</p></div></div>
+<p class="small" style="margin-top:34px">Cases, not people: we never score a person or a neighbourhood. Prototype runs on synthetic data plus public Seattle geography.</p>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>1 / 9</span></div></section><section class="slide"><div class="kick">The bottleneck</div><h1>Connecting cases, not collecting them</h1>
+<div class="cols"><div>
+<p>Official baseline: <b>$305 per case, $3.05M a year.</b></p>
+<table><tr><th>Step</th><th>Minutes</th><th>Who</th></tr>
+<tr><td>Intake</td><td>15</td><td>Officer</td></tr><tr><td>Report</td><td>60</td><td>Officer</td></tr>
+<tr><td>Video review</td><td>120</td><td>Officer</td></tr><tr><td>Evidence</td><td>45</td><td>Officer</td></tr>
+<tr><td><b>Detective follow-up</b></td><td><b>90</b></td><td><b>Detective: $1.05M, the largest cost</b></td></tr></table></div>
+<div><h2>Where an hour is least valuable</h2><p>A detective re-reading a no-lead report and cross-referencing by hand.</p>
+<ul><li>Clearance counts offenses: one arrest can clear every linked burglary.</li>
+<li>A few repeat offenders commit a large share of burglaries; most cases never get linked.</li>
+<li>Domain expert at kickoff: "We know who the bad guys are. We just don't have enough resources."</li></ul></div></div>
+<p class="small" style="margin-top:26px">Sources: case brief (baseline); Eck, PERF 1983 (most burglary investigations suspended early for lack of leads); FBI UCR clearance rules.</p>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>2 / 9</span></div></section><section class="slide"><div class="kick">What changes on Monday morning</div><h1>One screen for the sergeant and the detective</h1>
+<table style="width:100%;margin-top:10px"><tr><th></th><th>Today</th><th>With Casefile</th></tr>
+<tr><td><b>Sergeant</b></td><td>Reads 36 overnight reports one by one</td><td>Opens a queue already structured, scored and cross-referenced; screens out no-lead cases with a signed packet</td></tr>
+<tr><td><b>Detective</b></td><td>Hunts through RMS and pawn records</td><td>Gets a lead packet: linked cases, pawn hits, a next-steps checklist to accept or reject with a reason</td></tr>
+<tr><td><b>Victim</b></td><td>Hears nothing for weeks</td><td>Gets a plain-language update in their language, approved by staff</td></tr></table>
+<div class="ok">Stage 7 property matching feeds Stage 6: pawn serial hits are leads, never proof of ownership or guilt (pawn records are furnished to police under RCW 19.60.040).</div>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>3 / 9</span></div></section><section class="slide"><div class="kick">Demo</div><h1>Live from the prototype</h1>
+<div class="cols"><div style="flex:2"><div class="shot ph">UI screenshot</div></div><div><p>75-second walkthrough, recorded runs of real Claude agents replayed offline:</p>
+<ul><li>Overnight queue of 36 reports</li><li>Serial hit vs. look-alike rejected</li><li>Series proposed, then one case ruled out by the engine</li><li>Packet with citations</li><li>Human approval, audit log</li></ul></div></div>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>4 / 9</span></div></section><section class="slide"><div class="kick">Architecture</div><h1>AI proposes. The engine verifies. A detective decides.</h1>
+<div class="cols"><div>
+<span class="tag">Connectors</span><p class="small">MCP server (Rust): records, pawn feed, <b>verify_series</b>, solvability, citation checker, approval queue, cost model</p>
+<span class="tag h">Agents</span><p class="small">Extractor (Haiku) · Triage (Sonnet) · Series Hunter (Sonnet) · Skeptic (Opus) · Packet Writer (Sonnet) · Victim Liaison (Haiku)</p>
+<span class="tag s">Teams</span><p class="small">Intake &amp; Triage (per report) · Series Hunting (hunter ⇄ skeptic ⇄ engine, nightly) · Victim Comms (on status change)</p>
+<span class="tag o">Channels</span><p class="small">Sergeant console · detective packet · victim message draft (any language, staff-approved). Not built: patrol hands-free brief.</p>
+<div class="ok" style="font-size:16px">Approvals never block: requests queue with a ticket and escalate after 120 min, so human review waits hours, not days.</div></div>
+<div><h2>Single LLM vs. proposer + verifier (our eval)</h2>
+<table><tr><th>Cases</th><th>LLM only F1</th><th>Casefile F1</th><th>Decoy pairs accepted by LLM</th></tr><tr><td>20</td><td>not recorded</td><td><b>80%</b></td><td>-</td></tr><tr><td>60</td><td>not recorded</td><td><b>69%</b></td><td>-</td></tr><tr><td>150</td><td>not recorded</td><td><b>86%</b></td><td>-</td></tr></table>
+<p class="small">Planted series with decoys, synthetic ground truth. Casefile = engine clusters + verify_series pruning.</p>
+<h2 style="margin-top:12px">Full 2,000-case run</h2>
+<p class="small">Series pairs: precision 66%, recall 99%, 38/40 planted series recovered. Decoys rejected: 10/10. Exact-serial leads: 100/100 correct.</p></div></div>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>5 / 9</span></div></section><section class="slide"><div class="kick">Cost-benefit on the official baseline</div><h1>Base case: 9.4% net, short of the 15% target</h1>
+<div class="cols"><div>
+<div class="big">$285k</div><div class="lab">net per year, 9.4% of $3.05M (target 15% = $457.5k)</div>
+<table style="margin-top:12px"><tr><td>Detective + officer capacity freed</td><td>$428k</td></tr>
+<tr><td>Run cost</td><td>-$62k</td></tr>
+<tr><td>Funded follow-up of new leads</td><td>-$76k</td></tr>
+<tr><td>Dismissing false leads</td><td>-$4k</td></tr>
+<tr><td>One-time setup</td><td>$130k</td></tr>
+<tr><td>Year one (ramped)</td><td>$6k</td></tr></table></div>
+<div><table><tr><th>Scenario</th><th>Net %</th><th>+Clearances</th><th>Payback</th></tr>
+<tr><td>Conservative</td><td>2.1%</td><td>+45</td><td>4.1 y</td></tr>
+<tr><td>Base</td><td>9.4%</td><td>+262</td><td>1.0 y</td></tr>
+<tr><td>Optimistic</td><td>15.4%</td><td>+458</td><td>0.4 y</td></tr></table>
+<div class="warn">We probably miss 15%. Only the Optimistic bracket reaches it. Dollars are freed capacity (about 5,100 detective hours), not cash; freed hours fund follow-up, no layoffs. Cash savings need avoidable overtime or unfilled posts; finance must confirm.</div>
+<p class="small">The team research bot's more cautious bracket (3.5% net) sits between our Conservative and Base. The pilot decides.</p></div></div>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>6 / 9</span></div></section><section class="slide"><div class="kick">Clearance logic</div><h1>How 13% becomes 15.6%: new leads, worked by detectives</h1>
+<table style="font-size:19px"><tr><th>Step (Base)</th><th>Cases/yr</th></tr>
+<tr><td>Open cases linked to an arrest (1,300 cleared × 30% hit × 1.5 per hit × 85% adoption)</td><td>497</td></tr>
+<tr><td>Pawn/serial hits (10,000 × 35% traceable × 10% resurface × 85% × (1 − 20% already linked))</td><td>238</td></tr>
+<tr><td>Moderate cases newly worked (120 × 85% adoption)</td><td>102</td></tr>
+<tr><td><b>New leads</b> → 65% completed → 50% clear, minus 10 lost to screening</td><td><b>837 → +262</b></td></tr></table>
+<div class="warn">Base gives 15.6%, not the 16.25% target (+325). Only Optimistic (+458) clears it. The 50% conversion is unbenchmarked (today's clearance is 13%); at the conservative 35% the result is +45. Every factor is an assumption the pilot measures.</div>
+<p class="small">Follow-up hours are a cost, not a saving. False links cost detective time (184 false leads dismissed at 20 min each, 80% precision assumed; our eval measures 66% pair precision on synthetic data, so the real number is a pilot question).</p>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>7 / 9</span></div></section><section class="slide"><div class="kick">Pilot</div><h1>Prove it on one precinct before scaling</h1>
+<ul><li><b>Days 0–30:</b> integrate the RMS export and pawn feed in a CJIS-approved environment; train 1 sergeant and 6 detectives; replay 6 months of closed cases to measure link precision.</li>
+<li><b>Days 31–90:</b> randomized pilot: half of new burglaries get Casefile packets, half business as usual.</li>
+<li><b>Months 4–12:</b> expand only if the gates pass; quarterly accuracy and equity audits.</li></ul>
+<div class="ok" style="font-size:24px;margin-top:20px"><b>The one metric: cleared burglaries per detective-hour, pilot vs. control.</b> It captures both asks, savings and clearance, at once.</div>
+<p>Gates: link precision on replay meets the bar we set with the department; zero un-reviewed actions; no drop in clearance on screened cases.</p>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>8 / 9</span></div></section><section class="slide"><div class="kick">Ethics, trust and the ask</div><h1>Cases, not people. Humans decide. Everything is auditable.</h1>
+<div class="cols"><div><ul>
+<li><b>Bias:</b> links cases, never scores people or neighbourhoods; no predictive patrol; equity monitor on screening rates.</li>
+<li><b>Privacy:</b> CJIS-approved hosting; only data the department lawfully holds; no facial recognition.</li>
+<li><b>False positives:</b> skeptic agent plus rules engine rejected 10/10 decoy series; a serial match is a lead, not ownership.</li>
+<li><b>Human in the loop:</b> no send, assign or alert action exists without a click; hash-chained audit log; replays give identical output.</li></ul></div>
+<div><h2>Measured inference cost (recorded runs)</h2><table><tr><th>Agent</th><th>Model</th><th>$/run</th><th>n</th></tr><tr><td>extractor</td><td>haiku</td><td>$0.002</td><td>8</td></tr></table>
+<p class="small">Right-sized models: the cheapest adequate model per task.</p></div></div>
+<div class="ok" style="font-size:22px"><b>Ask:</b> approve a 90-day, one-precinct pilot; scale only if the gates pass. Full program: $130k setup, $62k/yr to run.</div>
+<div class="foot"><span>Synthetic data: Cascade City (fictional). AI suggests, people decide.</span><span>9 / 9</span></div></section></body></html>
