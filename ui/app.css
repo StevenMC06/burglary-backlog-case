@@ -247,6 +247,14 @@ input[type=search]:focus { outline: 3px solid var(--accent-line); outline-offset
 .toast { border-radius: 12px; }
 svg { border-radius: 12px; }
 
+/* Records-system structure: uppercase section labels and an incident field grid */
+.case-section > h2 { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0; margin: 0; background: var(--card); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+.fields > div { padding: 10px 14px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); min-width: 0; }
+.fields dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+.fields dd { margin: 3px 0 0; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.queue-head h2 { font-size: 15px; }
+
 /* motion: hover and press feedback in CSS; entrances are Web Animations in app.js */
 .bar i.pos { transform-origin: left center; }
 .bar i.neg { transform-origin: right center; }

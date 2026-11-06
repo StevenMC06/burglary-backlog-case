@@ -156,10 +156,23 @@ function renderCase() {
     h("div", { class: "heading-main" },
       h("h2", {}, c.id),
       h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)}`)));
-  fill(box, 
-    h("section", { class: "case-section" }, h("h2", {}, "Report"),
-      h("p", { class: "narr" }, c.narrative),
-      h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
+  const words = (x) => (x ? String(x).replace(/_/g, " ").replace(/^\w/, (ch) => ch.toUpperCase()) : null);
+  const mo = c.mo || {}, facts = c.facts || {};
+  const onFile = [facts.video_available && "Video", facts.traceable_property && "Traceable property", facts.witness && "Witness",
+    facts.physical_evidence && "Physical evidence", facts.suspect_description && "Suspect description", facts.vehicle_description && "Vehicle"].filter(Boolean);
+  const fields = [
+    ["Premise", words(mo.premise)],
+    ["Entry", [words(mo.entry_point), mo.entry_method].filter(Boolean).join(", ") || null],
+    ["Offense window", c.window_start != null ? `${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}` : null],
+    ["Reported", c.reported_at != null ? fmtTime(c.reported_at) : null],
+    ["Beat", c.beat || null],
+    ["On file", onFile.length ? onFile.join(", ") : "None"],
+  ].filter(([, v]) => v);
+  fill(box,
+    h("section", { class: "case-section" }, h("h2", {}, "Incident"),
+      h("dl", { class: "fields" }, fields.map(([k, v]) => h("div", {}, h("dt", {}, k), h("dd", {}, v))))),
+    h("section", { class: "case-section" }, h("h2", {}, "Narrative"),
+      h("p", { class: "narr" }, c.narrative)),
     h("section", { class: "case-section" }, h("h2", {}, "Property"),
       d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
       d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
