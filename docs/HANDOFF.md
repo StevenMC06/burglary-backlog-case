@@ -47,6 +47,41 @@ Worktrees live in `.claude/worktrees/agent-<id>`. To continue in place: `git mer
 8. Deck via the Artifact "Slides" type (type_url `https://claude.ai/artifact/8jTsAFQMFDb2oA8MsPJ2eL`), exported as PDF.
 9. Optionally push to the team repo `github.com/StevenMC06/burglary-backlog-case`. It is public and Kevin has WRITE access. **Ask Kevin before pushing.**
 
+## COST PLAN (Kevin: keep under $20, ~$10 ideal; API key billing)
+
+**Models**
+- Main session: **Sonnet 5.5**, set in `.claude/settings.local.json`.
+- Workers: `build-implementer` = **Sonnet 5.5, effort medium** (project override in `.claude/agents/`).
+- Use Opus only for: the skeptic recording (1–2 runs) and the 3 `series_llm_only` baseline runs.
+- Never spawn `build-architect` or `build-security` (both Opus).
+
+**Scope trims** (no loss in judged quality):
+- **W1:** skip `solvability::fit()`; use hand-set documented coefficients.
+- **W2:** slim generator: real Seattle points (already fetched) + templated narratives. **No Hugging Face dataset fits** (no public burglary narratives with offender ground truth, and the case bans real case data); checked 2026-11-05.
+- **W3:** recorder with sequential runs (no thread pool) and one retry. The 6 agents plus `series_llm_only`.
+- **W4:** build against the REAL merged engine and data (run it after W1 + W2). **No `--mock` mode.** One screen, at most 2 screenshot iterations.
+- **Recordings, heroes only:**
+  - extractor × 12 (Haiku)
+  - triage × 4 (Sonnet)
+  - series_hunter × 1 (Sonnet)
+  - skeptic × 1 (Opus)
+  - packet_writer × 2 (Sonnet)
+  - victim_liaison × 1 (Haiku)
+  - series_llm_only × 3 (Opus)
+  - Always use `--system-prompt-file` (replaces Claude Code's 57k-token default prompt) and disable built-in tools.
+- **Deck:** one build plus one visual QA pass.
+
+**Order** (sequential where it avoids rework): W1 + W2 in parallel → merge → W3 + W4 in parallel → merge → datagen → recordings → eval → video → deck → `docs/MORNING_REPORT.md`.
+
+**Budget rule:** after each phase, check spend (`/cost`). If the projected total exceeds $18, cut remaining recordings to the minimum hero set and skip the optional work. Stop and write the morning report if spend passes $20.
+
+**Estimate:** about $14–20 expected (workers ~$9–14, main ~$4–6, recordings ~$1–3).
+
+**"Web console"** = our product UI (the sergeant/detective dashboard), not web scraping. Scraping/browsing already works for free via the installed Playwright + Chrome; nothing to add.
+
+## Paste this into the fresh session
+> Resume from docs/HANDOFF.md and follow its COST PLAN exactly (main on Sonnet, workers = build-implementer on Sonnet medium, budget ≤ $20). Finish autonomously before 7 AM: complete W1–W4 from the paused branches, generate data, record the hero agent runs via `claude -p`, run evals, record the 75 s demo with the Kokoro voiceover, build the 9-slide deck as a Slides artifact and export a PDF, then write docs/MORNING_REPORT.md (results, spend, open questions, decisions for Kevin). Replay-only (no live API calls in the app). Don't push to GitHub or message anyone.
+
 ## Team / Discord
 - Kevin was to post the "Agree C" proposal in #general, asking for votes by 9 AM. No replies yet as of 10:10 PM.
 - Teammates: Steven (runs the research bot), KoolestAsian, Sonny, Gowrav.
