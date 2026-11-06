@@ -59,8 +59,17 @@ pub struct Scenario {
     pub traceable_share: f64,
     /// Share of traceable cases whose items resurface in the pawn feed within the window.
     pub resurface_rate: f64,
-    /// Moderate-solvability cases that newly get worked because packets free detective time.
+    /// Moderate-solvability cases that newly get worked because packets free detective time,
+    /// AT FULL ADOPTION (scaled by `adoption`: no packet use, no new leads).
     pub triage_leads: f64,
+    /// Share of surfaced linkage/property leads that are real (ASSUMPTION; replace with the eval's
+    /// measured precision). The rest are false leads a detective must dismiss.
+    pub lead_precision: f64,
+    /// Detective minutes to dismiss one false link or property match.
+    pub dismiss_min: f64,
+    /// Share of property leads that are also linkage leads (a case both linked and pawn-matched
+    /// is one lead, not two). Removed from the property count.
+    pub overlap_share: f64,
     /// Share of new leads whose follow-up is completed.
     pub completion: f64,
     /// Share of completed follow-ups that produce an incremental clearance.
@@ -91,6 +100,10 @@ pub struct CostResult {
     pub leads_from_triage: f64,
     pub followup_hours: f64,
     pub followup_cost: f64,
+    /// False linkage/property leads detectives must dismiss.
+    pub false_leads: f64,
+    /// Detective cost of dismissing them (a COST, like follow-up).
+    pub dismissal_cost: f64,
     pub steady_net: f64,
     pub steady_net_pct: f64,
     pub meets_cost_target: bool,
@@ -119,22 +132,33 @@ pub fn compute(s: &Scenario) -> CostResult {
     let gross = detective_hours_saved * DETECTIVE_RATE + officer_hours_saved * OFFICER_RATE;
 
     let baseline_cleared = CASES_PER_YEAR * CLEARANCE_RATE;
-    let leads_from_linkage = baseline_cleared * s.link_hit_rate * s.linked_open_per_hit;
-    let leads_from_property = CASES_PER_YEAR * s.traceable_share * s.resurface_rate * s.adoption;
-    let leads_from_triage = s.triage_leads;
+    // Every lead pathway runs through the packet, so all of them scale with adoption.
+    let leads_from_linkage =
+        baseline_cleared * s.link_hit_rate * s.linked_open_per_hit * s.adoption;
+    let leads_from_property = CASES_PER_YEAR
+        * s.traceable_share
+        * s.resurface_rate
+        * s.adoption
+        * (1.0 - s.overlap_share);
+    let leads_from_triage = s.triage_leads * s.adoption;
     let new_leads = leads_from_linkage + leads_from_property + leads_from_triage;
     let completed = new_leads * s.completion;
     let followup_hours = completed * s.followup_hours;
     let followup_cost = followup_hours * DETECTIVE_RATE;
+    // False links/matches: with precision p, each true lead comes with (1/p - 1) false ones.
+    let p = s.lead_precision.clamp(0.01, 1.0);
+    let false_leads = (leads_from_linkage + leads_from_property) * (1.0 / p - 1.0);
+    let dismissal_cost = false_leads * s.dismiss_min / 60.0 * DETECTIVE_RATE;
+    let work_cost = followup_cost + dismissal_cost;
 
     let recurring = sum(&s.recurring);
     let one_time = sum(&s.one_time);
-    let steady_net = gross - recurring - followup_cost;
-    let year_one_net = gross * s.year_one_ramp - recurring - followup_cost - one_time;
-    let year_one_cost = recurring + followup_cost + one_time;
+    let steady_net = gross - recurring - work_cost;
+    let year_one_net = gross * s.year_one_ramp - recurring - work_cost - one_time;
+    let year_one_cost = recurring + work_cost + one_time;
     let payback_years = if year_one_net >= 0.0 {
         // Recovers within year one; approximate linear month.
-        let monthly = (gross * s.year_one_ramp - recurring - followup_cost) / 12.0;
+        let monthly = (gross * s.year_one_ramp - recurring - work_cost) / 12.0;
         if monthly > 0.0 { Some((one_time / monthly) / 12.0) } else { None }
     } else if steady_net > 0.0 {
         Some(1.0 + (-year_one_net) / steady_net)
@@ -158,6 +182,8 @@ pub fn compute(s: &Scenario) -> CostResult {
         leads_from_triage,
         followup_hours,
         followup_cost,
+        false_leads,
+        dismissal_cost,
         steady_net,
         steady_net_pct: steady_net / ANNUAL_LABOR,
         meets_cost_target: steady_net >= COST_TARGET,
@@ -189,6 +215,9 @@ pub fn scenarios() -> Vec<Scenario> {
             traceable_share: 0.30,
             resurface_rate: 0.06,
             triage_leads: 60.0,
+            lead_precision: 0.70,
+            dismiss_min: 20.0,
+            overlap_share: 0.25,
             completion: 0.60,
             conversion: 0.35,
             followup_hours: 3.0,
@@ -219,6 +248,9 @@ pub fn scenarios() -> Vec<Scenario> {
             traceable_share: 0.35,
             resurface_rate: 0.10,
             triage_leads: 120.0,
+            lead_precision: 0.80,
+            dismiss_min: 20.0,
+            overlap_share: 0.20,
             completion: 0.65,
             conversion: 0.50,
             followup_hours: 2.0,
@@ -249,6 +281,9 @@ pub fn scenarios() -> Vec<Scenario> {
             traceable_share: 0.40,
             resurface_rate: 0.12,
             triage_leads: 150.0,
+            lead_precision: 0.90,
+            dismiss_min: 20.0,
+            overlap_share: 0.15,
             completion: 0.70,
             conversion: 0.50,
             followup_hours: 2.0,
@@ -295,8 +330,9 @@ mod tests {
         assert!((r.detective_hours_saved - 5_100.0).abs() < 1e-6);
         // 8,500 x 10 min = 1,416.67 officer hours.
         assert!((r.officer_hours_saved - 8_500.0 * 10.0 / 60.0).abs() < 1e-6);
-        // Leads: 1,300 x .3 x 1.5 = 585; 10,000 x .35 x .10 x .85 = 297.5; + 120.
-        assert!((r.new_leads - 1_002.5).abs() < 1e-6);
+        // Leads (all scale with adoption): linkage 1,300 x .3 x 1.5 x .85 = 497.25;
+        // property 10,000 x .35 x .10 x .85 x (1 - .20 overlap) = 238; triage 120 x .85 = 102.
+        assert!((r.new_leads - 837.25).abs() < 1e-6);
         assert!(r.steady_net > 0.0 && !r.meets_cost_target);
     }
 
@@ -306,6 +342,46 @@ mod tests {
         assert!(o.meets_cost_target && o.meets_clearance_target);
         let c = by_name("Conservative");
         assert!(!c.meets_cost_target && !c.meets_clearance_target);
+    }
+
+    fn base() -> Scenario {
+        scenarios().into_iter().find(|s| s.name == "Base").unwrap()
+    }
+
+    #[test]
+    fn clearances_scale_with_adoption() {
+        let mut s = base();
+        s.adoption = 0.0;
+        let r = compute(&s);
+        assert_eq!(r.new_leads, 0.0);
+        // Only the (non-positive) screening-loss honesty term remains.
+        assert!(r.additional_clearances <= 0.0);
+        let mut half = base();
+        half.adoption *= 0.5;
+        assert!(compute(&half).additional_clearances < compute(&base()).additional_clearances);
+    }
+
+    #[test]
+    fn false_leads_cost_detective_time() {
+        let mut worse = base();
+        worse.lead_precision = 0.40;
+        let (b, w) = (compute(&base()), compute(&worse));
+        assert!(w.false_leads > b.false_leads);
+        assert!(w.steady_net < b.steady_net, "lower precision must lower net");
+        let mut perfect = base();
+        perfect.lead_precision = 1.0;
+        assert_eq!(compute(&perfect).false_leads, 0.0);
+    }
+
+    #[test]
+    fn property_linkage_overlap_is_not_double_counted() {
+        let mut none = base();
+        none.overlap_share = 0.0;
+        let mut all = base();
+        all.overlap_share = 1.0;
+        assert_eq!(compute(&all).leads_from_property, 0.0);
+        assert!(compute(&none).leads_from_property > compute(&base()).leads_from_property);
+        assert!(compute(&none).additional_clearances > compute(&all).additional_clearances);
     }
 
     #[test]
