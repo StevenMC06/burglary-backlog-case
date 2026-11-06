@@ -6,8 +6,11 @@
 //!   casefile record  <agent> <input-id> [--model m]     run an agent once via `claude -p`, save run
 //!   casefile eval    [--out evals/report.md]            ground-truth evaluation
 //!   casefile cost    [--out docs/deck/cost.json]        cost & clearance scenarios (official baseline)
+//!   casefile bench   [--out evals/bench.md]             engine speed: brute-force reference vs optimised
+//!   casefile serve   --public                           bind 0.0.0.0 (or $PORT), sandboxed capped audit log
 
 mod audit;
+mod bench;
 mod cost_cli;
 mod datagen;
 mod eval;
@@ -45,8 +48,9 @@ fn main() -> anyhow::Result<()> {
         "record" => record::run(&rest),
         "eval" => eval::run(&rest),
         "cost" => cost_cli::run(&rest),
+        "bench" => bench::run(&rest),
         _ => {
-            eprintln!("usage: casefile <datagen|serve|mcp|record|eval|cost> [options]  (see src/main.rs)");
+            eprintln!("usage: casefile <datagen|serve|mcp|record|eval|cost|bench> [options]  (see src/main.rs)");
             Ok(())
         }
     }

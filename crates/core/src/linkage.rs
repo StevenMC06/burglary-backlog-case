@@ -281,18 +281,92 @@ pub fn pair_score(a: &Case, b: &Case) -> PairScore {
     }
 }
 
+/// Candidate in the top-k heap: "greater" means a better rank (higher score, then smaller id).
+struct Ranked<'a> {
+    score: f64,
+    case: &'a Case,
+}
+impl PartialEq for Ranked<'_> {
+    fn eq(&self, o: &Self) -> bool {
+        self.cmp(o).is_eq()
+    }
+}
+impl Eq for Ranked<'_> {}
+impl PartialOrd for Ranked<'_> {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
+    }
+}
+impl Ord for Ranked<'_> {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        self.score.total_cmp(&o.score).then_with(|| o.case.id.cmp(&self.case.id))
+    }
+}
+
+/// Upper bound on the pair score: full MO agreement and as many shared signatures as both cases
+/// hold. Never below the exact score, so a pair under a cutoff by this bound is under it exactly.
+fn score_upper_bound(x: &Case, y: &Case) -> f64 {
+    let shared = match (&x.mo, &y.mo) {
+        (Some(p), Some(q)) => p.signatures.len().min(q.signatures.len()),
+        _ => 0,
+    };
+    score_from_components(
+        &PairComponents {
+            mo_similarity: 1.0,
+            distance_km: haversine_km(x.location, y.location),
+            days_apart: (window_mid(x) - window_mid(y)).abs() / SECS_PER_DAY,
+            shared_signatures: shared,
+        },
+        true,
+    )
+}
+
 /// Top `k` other cases by pair score against `case_id`, descending, ties broken by case id.
-/// Unknown id => empty. Scores every other case (no prefilter).
+/// Unknown id => empty. Exact, not a prefilter: a bounded min-heap keeps the best `k` seen so far
+/// (O(n log k)), and a case whose score upper bound is already below the current k-th best is
+/// skipped without any MO work. Only the `k` survivors allocate a [`PairScore`].
 pub fn similar_cases(ds: &Dataset, case_id: &str, k: usize) -> Vec<PairScore> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
     let Some(target) = ds.cases.iter().find(|c| c.id == case_id) else {
         return Vec::new();
     };
-    let mut out: Vec<PairScore> = ds
-        .cases
-        .iter()
-        .filter(|c| c.id != case_id)
-        .map(|c| pair_score(target, c))
-        .collect();
+    if k == 0 {
+        return Vec::new();
+    }
+    let mut heap: BinaryHeap<Reverse<Ranked>> = BinaryHeap::with_capacity(k.min(ds.cases.len()) + 1);
+    for c in ds.cases.iter().filter(|c| c.id != case_id) {
+        if heap.len() == k
+            && let Some(Reverse(worst)) = heap.peek()
+        {
+            let (x, y) = if target.id <= c.id { (target, c) } else { (c, target) };
+            if score_upper_bound(x, y) < worst.score {
+                continue;
+            }
+        }
+        let score = score_from_components(&components(target, c), target.mo.is_some() && c.mo.is_some());
+        let cand = Ranked { score, case: c };
+        if heap.len() < k {
+            heap.push(Reverse(cand));
+        } else if heap.peek().is_some_and(|Reverse(w)| cand > *w) {
+            heap.pop();
+            heap.push(Reverse(cand));
+        }
+    }
+    let mut best: Vec<Ranked> = heap.into_iter().map(|Reverse(r)| r).collect();
+    best.sort_by(|a, b| b.cmp(a));
+    best.into_iter().map(|r| pair_score(target, r.case)).collect()
+}
+
+/// Brute-force reference for [`similar_cases`]: score everything, full sort, truncate. Oracle for
+/// tests and `casefile bench`.
+#[doc(hidden)]
+pub fn similar_cases_reference(ds: &Dataset, case_id: &str, k: usize) -> Vec<PairScore> {
+    let Some(target) = ds.cases.iter().find(|c| c.id == case_id) else {
+        return Vec::new();
+    };
+    let mut out: Vec<PairScore> =
+        ds.cases.iter().filter(|c| c.id != case_id).map(|c| pair_score(target, c)).collect();
     out.sort_by(|x, y| y.score.total_cmp(&x.score).then_with(|| x.b.cmp(&y.b)));
     out.truncate(k);
     out
@@ -455,7 +529,218 @@ fn rationale(members: &[&Case], edges: &[Edge], pos: &[usize], t: f64) -> String
 /// [`MAX_LINK_KM`] apart are never candidates. Output is deterministic: ids are `S-1`, `S-2`...
 /// in ascending order of each cluster's smallest case id, and `case_ids` are sorted.
 /// These are hypotheses for `verify::verify_series`, never conclusions.
+///
+/// Implementation (same output as [`propose_clusters_reference`], pinned by tests): cases are
+/// prepared once (property types as a bitmask, signatures interned to sorted integer ids), then a
+/// time-sorted sweep visits only pairs inside [`MAX_LINK_DAYS`]. For each, an upper bound on the
+/// score (full MO agreement, as many shared signatures as both cases hold) rejects the pair before
+/// any MO work when even that cannot reach `threshold`. Survivors get the exact same formula,
+/// allocation-free, split across threads and re-ordered by `(i, j)`.
 pub fn propose_clusters(ds: &Dataset, threshold: f64) -> Vec<SeriesHypothesis> {
+    let mut sorted: Vec<&Case> = ds.cases.iter().collect();
+    sorted.sort_by(|a, b| a.id.cmp(&b.id));
+    let n = sorted.len();
+    let prep = Prepared::new(&sorted);
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| prep.mid[a].total_cmp(&prep.mid[b]).then(a.cmp(&b)));
+
+    let threads = if n < 512 { 1 } else { std::thread::available_parallelism().map_or(1, |p| p.get().min(8)) };
+    let chunk = n.div_ceil(threads).max(1);
+    let mut edges: Vec<Edge> = std::thread::scope(|sc| {
+        let handles: Vec<_> = (0..n)
+            .step_by(chunk)
+            .map(|lo| {
+                let (prep, order) = (&prep, &order);
+                sc.spawn(move || prep.edges_from(order, lo..(lo + chunk).min(n), threshold))
+            })
+            .collect();
+        handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
+    });
+    edges.sort_by_key(|e| (e.0, e.1));
+    clusters_from_edges(&sorted, edges, threshold)
+}
+
+/// Per-case numbers computed once so the pair loop does no allocation and no string work.
+struct Prepared<'a> {
+    cases: &'a [&'a Case],
+    mid: Vec<f64>,
+    mo: Vec<Option<MoBits<'a>>>,
+}
+
+struct MoBits<'a> {
+    mo: &'a Mo,
+    props: u16,
+    /// Interned (trimmed, ASCII-lowercased) signatures, sorted and deduplicated.
+    sigs: Vec<u32>,
+}
+
+fn jaccard_mask(a: u16, b: u16) -> f64 {
+    let inter = (a & b).count_ones();
+    let union = a.count_ones() + b.count_ones() - inter;
+    if union == 0 { 0.0 } else { inter as f64 / union as f64 }
+}
+
+/// Size of the intersection of two sorted, deduplicated id lists (merge walk).
+fn sorted_inter(a: &[u32], b: &[u32]) -> usize {
+    let (mut i, mut j, mut n) = (0, 0, 0);
+    while i < a.len() && j < b.len() {
+        match a[i].cmp(&b[j]) {
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+            std::cmp::Ordering::Equal => {
+                n += 1;
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    n
+}
+
+fn jaccard_sorted(a: &[u32], b: &[u32]) -> f64 {
+    let union = a.len() + b.len() - sorted_inter(a, b);
+    if union == 0 { 0.0 } else { sorted_inter(a, b) as f64 / union as f64 }
+}
+
+impl<'a> Prepared<'a> {
+    fn new(cases: &'a [&'a Case]) -> Self {
+        let mut ids: std::collections::HashMap<String, u32> = Default::default();
+        let mo = cases
+            .iter()
+            .map(|c| {
+                c.mo.as_ref().map(|m| {
+                    let mut sigs: Vec<u32> = m
+                        .signatures
+                        .iter()
+                        .map(|s| {
+                            let next = ids.len() as u32;
+                            *ids.entry(s.trim().to_ascii_lowercase()).or_insert(next)
+                        })
+                        .collect();
+                    sigs.sort_unstable();
+                    sigs.dedup();
+                    let props = m.property_types.iter().fold(0u16, |acc, p| acc | (1 << (*p as u16)));
+                    MoBits { mo: m, props, sigs }
+                })
+            })
+            .collect();
+        Prepared { cases, mid: cases.iter().map(|c| window_mid(c)).collect(), mo }
+    }
+
+    /// Same value, bit for bit, as `mo_sim` on the two MOs, plus the shared-signature count.
+    fn mo_sim(&self, i: usize, j: usize) -> Option<(f64, usize)> {
+        let (a, b) = (self.mo[i].as_ref()?, self.mo[j].as_ref()?);
+        let (x, y) = (a.mo, b.mo);
+        let agree = |same: bool, unknown: bool| if same && !unknown { 1.0 } else { 0.0 };
+        let sim = W_PREMISE * agree(x.premise == y.premise, false)
+            + W_ENTRY_POINT * agree(x.entry_point == y.entry_point, x.entry_point == EntryPoint::Unknown)
+            + W_ENTRY_METHOD * agree(x.entry_method == y.entry_method, x.entry_method == EntryMethod::Unknown)
+            + W_TIME_BAND * agree(x.time_band == y.time_band, x.time_band == TimeBand::Unknown)
+            + W_WEEKDAY * agree(x.weekday == y.weekday, false)
+            + W_PROPERTY * jaccard_mask(a.props, b.props)
+            + W_SIGNATURES * jaccard_sorted(&a.sigs, &b.sigs);
+        Some((sim.clamp(0.0, 1.0), sorted_inter(&a.sigs, &b.sigs)))
+    }
+
+    /// Edges `(i, j, score)`, `i < j` in id-sorted positions, reaching `threshold`, for the cases
+    /// at `order[range]` paired with every later-in-time case inside the link window.
+    fn edges_from(&self, order: &[usize], range: std::ops::Range<usize>, threshold: f64) -> Vec<Edge> {
+        let km_per_deg = 111.2_f64;
+        let mut out = Vec::new();
+        for p in range {
+            let a = order[p];
+            for &b in &order[p + 1..] {
+                if (self.mid[b] - self.mid[a]) / SECS_PER_DAY > MAX_LINK_DAYS {
+                    break; // sorted by time: every later case is further away still
+                }
+                let (i, j) = if a < b { (a, b) } else { (b, a) };
+                let (pa, pb) = (self.cases[i].location, self.cases[j].location);
+                let dlat = (pa.lat - pb.lat).abs() * km_per_deg;
+                let cos = (((pa.lat + pb.lat) / 2.0).to_radians()).cos().abs();
+                let dlon = (pa.lon - pb.lon).abs() * km_per_deg * cos;
+                if dlat > MAX_LINK_KM || dlon > MAX_LINK_KM {
+                    continue;
+                }
+                let distance_km = haversine_km(pa, pb);
+                let days_apart = (self.mid[i] - self.mid[j]).abs() / SECS_PER_DAY;
+                let (sa, sb) = (&self.mo[i], &self.mo[j]);
+                let max_shared = match (sa, sb) {
+                    (Some(x), Some(y)) => x.sigs.len().min(y.sigs.len()),
+                    _ => 0,
+                };
+                let bound = score_from_components(
+                    &PairComponents { mo_similarity: 1.0, distance_km, days_apart, shared_signatures: max_shared },
+                    true,
+                );
+                if bound < threshold {
+                    continue;
+                }
+                let (mo_similarity, shared_signatures) = self.mo_sim(i, j).unwrap_or((0.0, 0));
+                let c = PairComponents { mo_similarity, distance_km, days_apart, shared_signatures };
+                let score = score_from_components(&c, sa.is_some() && sb.is_some());
+                if score >= threshold {
+                    out.push((i, j, score));
+                }
+            }
+        }
+        out
+    }
+}
+
+/// How many pairs survive each stage of [`propose_clusters`] at `threshold`:
+/// `[all pairs, inside the time window, inside the box, pass the upper bound, edges]`.
+/// For explaining and benchmarking only; single-threaded.
+#[doc(hidden)]
+pub fn pair_funnel(ds: &Dataset, threshold: f64) -> [usize; 5] {
+    let mut sorted: Vec<&Case> = ds.cases.iter().collect();
+    sorted.sort_by(|a, b| a.id.cmp(&b.id));
+    let n = sorted.len();
+    let prep = Prepared::new(&sorted);
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| prep.mid[a].total_cmp(&prep.mid[b]).then(a.cmp(&b)));
+    let mut f = [n * n.saturating_sub(1) / 2, 0, 0, 0, 0];
+    for p in 0..n {
+        let a = order[p];
+        for &b in &order[p + 1..] {
+            if (prep.mid[b] - prep.mid[a]) / SECS_PER_DAY > MAX_LINK_DAYS {
+                break;
+            }
+            f[1] += 1;
+            let (i, j) = if a < b { (a, b) } else { (b, a) };
+            let (pa, pb) = (sorted[i].location, sorted[j].location);
+            let dlat = (pa.lat - pb.lat).abs() * 111.2;
+            let dlon = (pa.lon - pb.lon).abs() * 111.2 * (((pa.lat + pb.lat) / 2.0).to_radians()).cos().abs();
+            if dlat > MAX_LINK_KM || dlon > MAX_LINK_KM {
+                continue;
+            }
+            f[2] += 1;
+            let max_shared = match (&prep.mo[i], &prep.mo[j]) {
+                (Some(x), Some(y)) => x.sigs.len().min(y.sigs.len()),
+                _ => 0,
+            };
+            let (distance_km, days_apart) = (haversine_km(pa, pb), (prep.mid[i] - prep.mid[j]).abs() / SECS_PER_DAY);
+            let bound = score_from_components(
+                &PairComponents { mo_similarity: 1.0, distance_km, days_apart, shared_signatures: max_shared },
+                true,
+            );
+            if bound < threshold {
+                continue;
+            }
+            f[3] += 1;
+            let (mo_similarity, shared_signatures) = prep.mo_sim(i, j).unwrap_or((0.0, 0));
+            let c = PairComponents { mo_similarity, distance_km, days_apart, shared_signatures };
+            if score_from_components(&c, prep.mo[i].is_some() && prep.mo[j].is_some()) >= threshold {
+                f[4] += 1;
+            }
+        }
+    }
+    f
+}
+
+/// Brute-force reference for [`propose_clusters`]: every pair inside the time/box prefilter goes
+/// through [`pair_score`]. Oracle for tests and `casefile bench`.
+#[doc(hidden)]
+pub fn propose_clusters_reference(ds: &Dataset, threshold: f64) -> Vec<SeriesHypothesis> {
     let mut sorted: Vec<&Case> = ds.cases.iter().collect();
     sorted.sort_by(|a, b| a.id.cmp(&b.id));
     let n = sorted.len();
@@ -483,6 +768,13 @@ pub fn propose_clusters(ds: &Dataset, threshold: f64) -> Vec<SeriesHypothesis> {
         }
     }
 
+    clusters_from_edges(&sorted, edges, threshold)
+}
+
+/// Shared tail: components, re-split while too large, then hypotheses. `sorted` is id-sorted and
+/// `edges` hold positions in it, ordered by `(i, j)`.
+fn clusters_from_edges(sorted: &[&Case], edges: Vec<Edge>, threshold: f64) -> Vec<SeriesHypothesis> {
+    let n = sorted.len();
     // Components, re-split while too large.
     let mut done: Vec<(Vec<usize>, f64)> = Vec::new();
     let mut work: Vec<(Vec<usize>, f64)> = components_at(n, &edges, threshold)
@@ -881,6 +1173,74 @@ mod tests {
         let cl = propose_clusters(&ds, 0.5);
         assert_eq!(cl.len(), 1);
         assert_eq!(cl[0].case_ids, vec!["A00", "A01"]);
+    }
+
+    /// Deterministic pseudo-random dataset with the awkward cases: missing MOs, Unknown values,
+    /// duplicate and differently-cased signatures, empty lists, shared coordinates and times.
+    pub(crate) fn fuzz_dataset(n: usize, seed: u64) -> Dataset {
+        let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut rnd = move |m: u64| {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (s >> 33) % m
+        };
+        let sigs = ["ransacked", "Ransacked ", "pillowcase", "cut_phone_line", "muddy_prints", "PILLOWCASE"];
+        let cases = (0..n)
+            .map(|i| {
+                let mut c = case(
+                    &format!("F{:05}", (i * 7919) % 100_003),
+                    LAT + rnd(40) as f64 * 0.004,
+                    LON + rnd(40) as f64 * 0.004,
+                    rnd(300) as i64 * DAY + rnd(3) as i64 * HOUR,
+                    1 + rnd(12) as i64,
+                );
+                c.mo = if rnd(10) == 0 {
+                    None
+                } else {
+                    Some(Mo {
+                        premise: [Premise::Residential, Premise::Commercial, Premise::Garage][rnd(3) as usize],
+                        entry_point: [EntryPoint::RearDoor, EntryPoint::Window, EntryPoint::Unknown][rnd(3) as usize],
+                        entry_method: [EntryMethod::Pry, EntryMethod::Smash, EntryMethod::Unknown][rnd(3) as usize],
+                        time_band: [TimeBand::Night, TimeBand::Midday, TimeBand::Unknown][rnd(3) as usize],
+                        weekday: rnd(2) == 0,
+                        property_types: (0..rnd(4))
+                            .map(|_| [PropertyType::Laptop, PropertyType::Cash, PropertyType::Tools, PropertyType::Other][rnd(4) as usize])
+                            .collect(),
+                        signatures: (0..rnd(5)).map(|_| sigs[rnd(6) as usize].to_string()).collect(),
+                    })
+                };
+                c
+            })
+            .collect();
+        Dataset { cases, pawn: vec![] }
+    }
+
+    #[test]
+    fn fast_clusters_equal_reference_on_fuzzed_data() {
+        for (n, seed) in [(60, 1), (400, 2), (700, 3)] {
+            let ds = fuzz_dataset(n, seed);
+            for t in [0.2, 0.5, 0.8, 0.9, 0.99] {
+                assert_eq!(propose_clusters(&ds, t), propose_clusters_reference(&ds, t), "n={n} seed={seed} t={t}");
+            }
+        }
+    }
+
+    #[test]
+    fn pair_funnel_narrows_and_counts_edges() {
+        let ds = fuzz_dataset(400, 2);
+        let f = pair_funnel(&ds, 0.5);
+        assert_eq!(f[0], 400 * 399 / 2);
+        assert!(f.windows(2).all(|w| w[0] >= w[1]), "{f:?}");
+        assert!(f[4] > 0, "fuzz data should produce some edges: {f:?}");
+    }
+
+    #[test]
+    fn fast_similar_cases_equal_reference_on_fuzzed_data() {
+        let ds = fuzz_dataset(300, 9);
+        for c in ds.cases.iter().step_by(23) {
+            for k in [0, 1, 5, 50, 400] {
+                assert_eq!(similar_cases(&ds, &c.id, k), similar_cases_reference(&ds, &c.id, k), "{} k={k}", c.id);
+            }
+        }
     }
 
     #[test]

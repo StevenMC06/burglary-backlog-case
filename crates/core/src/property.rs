@@ -13,7 +13,7 @@
 //! `match_case` returns matches for every item of the case, sorted by status strength then
 //! days_after_offense. `all_hits` scans all cases (used by nightly batch / evals).
 use crate::types::*;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 const SECS_PER_DAY: f64 = 86_400.0;
 /// Minimum description token Jaccard for an unresolved similar-description match.
@@ -31,12 +31,6 @@ fn tokens(s: &str) -> BTreeSet<String> {
     s.split(|c: char| !c.is_alphanumeric()).filter(|t| !t.is_empty()).map(|t| t.to_lowercase()).collect()
 }
 
-fn jaccard(a: &str, b: &str) -> f64 {
-    let (x, y) = (tokens(a), tokens(b));
-    let union = x.union(&y).count();
-    if union == 0 { 0.0 } else { x.intersection(&y).count() as f64 / union as f64 }
-}
-
 fn same_opt(a: &Option<String>, b: &Option<String>) -> bool {
     matches!((a, b), (Some(x), Some(y)) if x.trim().eq_ignore_ascii_case(y.trim()))
 }
@@ -50,7 +44,58 @@ fn strength(s: MatchStatus) -> u8 {
     }
 }
 
+/// An item with its serial, markings and description normalised once.
+struct ItemView<'a> {
+    item: &'a StolenItem,
+    serial: Option<String>,
+    marks: BTreeSet<String>,
+    tokens: BTreeSet<String>,
+}
+
+impl<'a> ItemView<'a> {
+    fn new(item: &'a StolenItem) -> Self {
+        ItemView {
+            item,
+            serial: serial_of(&item.serial),
+            marks: item.markings.iter().map(|m| m.trim().to_lowercase()).filter(|m| !m.is_empty()).collect(),
+            tokens: tokens(&item.description),
+        }
+    }
+}
+
+/// A pawn record with its serial, markings (in record order) and description normalised once.
+struct PawnView<'a> {
+    pawn: &'a PawnRecord,
+    serial: Option<String>,
+    marks: Vec<String>,
+    tokens: BTreeSet<String>,
+}
+
+impl<'a> PawnView<'a> {
+    fn new(pawn: &'a PawnRecord) -> Self {
+        PawnView {
+            pawn,
+            serial: serial_of(&pawn.serial),
+            marks: pawn.markings.iter().map(|m| m.trim().to_lowercase()).collect(),
+            tokens: tokens(&pawn.description),
+        }
+    }
+}
+
+fn jaccard_sets(x: &BTreeSet<String>, y: &BTreeSet<String>) -> f64 {
+    let inter = x.intersection(y).count();
+    let union = x.len() + y.len() - inter;
+    if union == 0 { 0.0 } else { inter as f64 / union as f64 }
+}
+
 pub fn compare(case: &Case, item: &StolenItem, pawn: &PawnRecord) -> Option<PropertyMatch> {
+    compare_views(case, &ItemView::new(item), &PawnView::new(pawn))
+}
+
+/// The matching rules (module docs), on pre-normalised views. Single source of truth for both
+/// [`compare`] and the indexed batch path.
+fn compare_views(case: &Case, iv: &ItemView, pv: &PawnView) -> Option<PropertyMatch> {
+    let (item, pawn) = (iv.item, pv.pawn);
     if pawn.received_at < case.window_start {
         return None;
     }
@@ -66,8 +111,7 @@ pub fn compare(case: &Case, item: &StolenItem, pawn: &PawnRecord) -> Option<Prop
         })
     };
     let same_cat = item.category == pawn.category;
-    let (si, sp) = (serial_of(&item.serial), serial_of(&pawn.serial));
-    if let (Some(a), Some(b)) = (&si, &sp) {
+    if let (Some(a), Some(b)) = (&iv.serial, &pv.serial) {
         if a == b {
             return mk(
                 MatchStatus::ExactSerialLead,
@@ -83,9 +127,7 @@ pub fn compare(case: &Case, item: &StolenItem, pawn: &PawnRecord) -> Option<Prop
             None
         };
     }
-    let item_marks: BTreeSet<String> =
-        item.markings.iter().map(|m| m.trim().to_lowercase()).filter(|m| !m.is_empty()).collect();
-    if let Some(m) = pawn.markings.iter().map(|m| m.trim().to_lowercase()).find(|m| item_marks.contains(m)) {
+    if let Some(m) = pv.marks.iter().find(|m| iv.marks.contains(*m)) {
         return mk(
             MatchStatus::ReviewCandidateMarking,
             format!("shared marking \"{}\"; needs human review", m),
@@ -96,7 +138,7 @@ pub fn compare(case: &Case, item: &StolenItem, pawn: &PawnRecord) -> Option<Prop
     }
     let brand = same_opt(&item.brand, &pawn.brand);
     let model_ok = same_opt(&item.model, &pawn.model) || item.model.is_none() || pawn.model.is_none();
-    let j = jaccard(&item.description, &pawn.description);
+    let j = jaccard_sets(&iv.tokens, &pv.tokens);
     if (brand && model_ok) || j >= DESC_JACCARD_MIN {
         return mk(
             MatchStatus::UnresolvedSimilarDescription,
@@ -124,7 +166,84 @@ pub fn match_case(ds: &Dataset, case_id: &str) -> Vec<PropertyMatch> {
     out
 }
 
+/// Pawn records normalised once and bucketed so each stolen item is compared only with records
+/// that can possibly match it. A record can match an item only if it (a) shares the item's
+/// category (needed for a conflicting-serial or similar-description result), (b) carries the same
+/// normalised serial (an exact-serial lead, any category), or (c) carries one of the item's
+/// markings (a marking candidate, any category). Every other record returns no match under the
+/// rules, so skipping it loses nothing. Candidates are visited in record order, so the output is
+/// identical to the brute-force scan (pinned by tests).
+pub struct PropertyIndex<'a> {
+    views: Vec<PawnView<'a>>,
+    by_category: HashMap<PropertyType, Vec<usize>>,
+    by_serial: HashMap<String, Vec<usize>>,
+    by_marking: HashMap<String, Vec<usize>>,
+}
+
+impl<'a> PropertyIndex<'a> {
+    pub fn new(ds: &'a Dataset) -> Self {
+        let views: Vec<PawnView> = ds.pawn.iter().map(PawnView::new).collect();
+        let (mut by_category, mut by_serial, mut by_marking) =
+            (HashMap::<_, Vec<usize>>::new(), HashMap::<_, Vec<usize>>::new(), HashMap::<_, Vec<usize>>::new());
+        for (k, v) in views.iter().enumerate() {
+            by_category.entry(v.pawn.category).or_default().push(k);
+            if let Some(s) = &v.serial {
+                by_serial.entry(s.clone()).or_default().push(k);
+            }
+            for m in v.marks.iter().filter(|m| !m.is_empty()) {
+                by_marking.entry(m.clone()).or_default().push(k);
+            }
+        }
+        PropertyIndex { views, by_category, by_serial, by_marking }
+    }
+
+    /// Same result as [`match_case`] for this case.
+    pub fn match_case(&self, case: &Case) -> Vec<PropertyMatch> {
+        let mut out = Vec::new();
+        let mut cand: Vec<usize> = Vec::new();
+        for item in &case.items {
+            let iv = ItemView::new(item);
+            cand.clear();
+            cand.extend(self.by_category.get(&item.category).into_iter().flatten());
+            if let Some(s) = &iv.serial {
+                cand.extend(self.by_serial.get(s).into_iter().flatten());
+            }
+            for m in &iv.marks {
+                cand.extend(self.by_marking.get(m).into_iter().flatten());
+            }
+            cand.sort_unstable();
+            cand.dedup();
+            out.extend(cand.iter().filter_map(|&k| compare_views(case, &iv, &self.views[k])));
+        }
+        sort_matches(&mut out);
+        out
+    }
+}
+
+fn sort_matches(out: &mut [PropertyMatch]) {
+    out.sort_by(|a, b| {
+        strength(a.status)
+            .cmp(&strength(b.status))
+            .then(a.days_after_offense.total_cmp(&b.days_after_offense))
+            .then_with(|| (&a.item_id, &a.pawn_id).cmp(&(&b.item_id, &b.pawn_id)))
+    });
+}
+
+/// Every match for every case, via [`PropertyIndex`] (built once).
 pub fn all_hits(ds: &Dataset) -> Vec<PropertyMatch> {
+    let idx = PropertyIndex::new(ds);
+    // match_case looks a case up by id (first wins), so duplicate ids resolve the same way here.
+    let mut first: HashMap<&str, &Case> = HashMap::new();
+    for c in &ds.cases {
+        first.entry(c.id.as_str()).or_insert(c);
+    }
+    ds.cases.iter().flat_map(|c| idx.match_case(first.get(c.id.as_str()).copied().unwrap_or(c))).collect()
+}
+
+/// Brute-force reference for [`all_hits`]: every item against every record. Oracle for tests and
+/// `casefile bench`.
+#[doc(hidden)]
+pub fn all_hits_reference(ds: &Dataset) -> Vec<PropertyMatch> {
     ds.cases.iter().flat_map(|c| match_case(ds, &c.id)).collect()
 }
 
@@ -160,6 +279,75 @@ mod tests {
             seller_ref: "S1".into(),
         }
     }
+    /// Pseudo-random cases and pawn records exercising every rule branch: shared and conflicting
+    /// serials (with formatting noise), cross-category serials, markings with case/space noise,
+    /// empty markings, brand/model look-alikes, description overlap and pre-offense records.
+    fn fuzz(n_cases: usize, n_pawn: usize, seed: u64) -> Dataset {
+        let mut s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        let mut rnd = move |m: u64| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s % m
+        };
+        let cats = [PropertyType::Laptop, PropertyType::Phone, PropertyType::Jewelry];
+        let serials = ["AB-123", "ab123", "SN0123", "SNO123", "ZZ9", ""];
+        let marks = ["Sticker Fox", " sticker fox", "engraved J", "", "blue tape"];
+        let words = ["silver", "thin", "laptop", "gold", "ring", "black", "phone", "case"];
+        let desc = |r: &mut dyn FnMut(u64) -> u64| (0..1 + r(4)).map(|_| words[r(8) as usize]).collect::<Vec<_>>().join(" ");
+        let mut cases = vec![];
+        for i in 0..n_cases {
+            let mut c = case(&format!("C{i:04}"), 47.6, -122.3, rnd(60) as i64 * DAY, 4);
+            c.items = (0..rnd(4))
+                .map(|k| StolenItem {
+                    id: format!("C{i:04}-I{k}"),
+                    category: cats[rnd(3) as usize],
+                    brand: [None, Some("Acme".to_string()), Some(" acme".to_string())][rnd(3) as usize].clone(),
+                    model: [None, Some("X1".to_string())][rnd(2) as usize].clone(),
+                    serial: (rnd(2) == 0).then(|| serials[rnd(6) as usize].to_string()),
+                    description: desc(&mut rnd),
+                    markings: (0..rnd(3)).map(|_| marks[rnd(5) as usize].to_string()).collect(),
+                    value_usd: 100,
+                })
+                .collect();
+            cases.push(c);
+        }
+        let pawn = (0..n_pawn)
+            .map(|k| PawnRecord {
+                id: format!("P{k:04}"),
+                dealer: "D1".into(),
+                received_at: T0 + (rnd(80) as i64 - 10) * DAY,
+                location: GeoPoint { lat: 47.6, lon: -122.3 },
+                category: cats[rnd(3) as usize],
+                brand: [None, Some("ACME".to_string())][rnd(2) as usize].clone(),
+                model: [None, Some("x1 ".to_string()), Some("X2".to_string())][rnd(3) as usize].clone(),
+                serial: (rnd(2) == 0).then(|| serials[rnd(6) as usize].to_string()),
+                description: desc(&mut rnd),
+                markings: (0..rnd(3)).map(|_| marks[rnd(5) as usize].to_string()).collect(),
+                seller_ref: "S1".into(),
+            })
+            .collect();
+        Dataset { cases, pawn }
+    }
+
+    #[test]
+    fn indexed_all_hits_equal_brute_force() {
+        for seed in 1..6 {
+            let d = fuzz(120, 150, seed);
+            let fast = all_hits(&d);
+            assert_eq!(fast, all_hits_reference(&d), "seed {seed}");
+            // The fuzz must reach every outcome, or the equality above proves little.
+            for st in [
+                MatchStatus::ExactSerialLead,
+                MatchStatus::RejectedConflictingSerial,
+                MatchStatus::ReviewCandidateMarking,
+                MatchStatus::UnresolvedSimilarDescription,
+            ] {
+                assert!(fast.iter().any(|m| m.status == st), "seed {seed} never produced {st:?}");
+            }
+        }
+    }
+
     fn ds(items: Vec<StolenItem>, pawns: Vec<PawnRecord>) -> Dataset {
         let mut c = case("C1", 47.6, -122.3, 0, 2);
         c.items = items;

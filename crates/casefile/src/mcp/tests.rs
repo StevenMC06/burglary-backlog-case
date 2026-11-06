@@ -197,6 +197,27 @@ async fn search_cases_filters_and_limits() {
 }
 
 #[tokio::test]
+async fn propose_clusters_filters_by_case_id() {
+    let root = temp_root();
+    let s = server_in(&root);
+    let call = |case_id: Option<&str>| {
+        let p = ProposeClustersParams { threshold: Some(0.0), case_id: case_id.map(String::from) };
+        let s = &s;
+        async move { s.propose_clusters(Parameters(p)).await }
+    };
+    let all = parse(&call(None).await.unwrap());
+    assert!(all["returned"].as_u64().unwrap() >= 1, "{all}");
+    let one = parse(&call(Some(" CC-25-000001 ")).await.unwrap());
+    assert_eq!(one["case_id"], "CC-25-000001");
+    assert_eq!(one["total_clusters"], all["total_clusters"]);
+    let shown = one["clusters"].as_array().unwrap();
+    assert!(!shown.is_empty());
+    assert!(shown.iter().all(|c| c["case_ids"].as_array().unwrap().iter().any(|x| x == "CC-25-000001")));
+    assert!(call(Some("NOPE")).await.unwrap_err().contains("NOPE"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn verify_series_rejects_bad_input_without_panicking() {
     let root = temp_root();
     let s = server_in(&root);
