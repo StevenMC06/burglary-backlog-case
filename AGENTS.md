@@ -7,4 +7,5 @@
 - **Windows shell:** write files with the Write/Edit tools. Bash heredocs containing quotes have failed in this environment.
 - **Cost discipline:** read only the files your brief names. Don't re-read files you just wrote. Keep test fixtures small. At most 2 screenshot iterations for UI.
 - **Commits:** Conventional Commits, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, using `git -c user.name="Kevin" -c user.email="khanhpham01012003@gmail.com"`.
+- **Evidence rule (Kevin, standing):** every claim needs research + math + eval backup, with edge cases and only task-relevant benchmarks; check against Guy's rubric. Read `docs/EVIDENCE_AND_REVIEW.md` before touching cost, eval, deck or demo.
 - Specs: `docs/BUILD_PLAN.md`. Case facts: `docs/CASE_OFFICIAL.md`.

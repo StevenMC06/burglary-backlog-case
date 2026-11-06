@@ -3,6 +3,7 @@
 **Deadline:** deck to ddolev@uw.edu by **Fri 1:00 PM**. Pitch 3:03 PM, DEM 004.
 
 ## Read first (in this order)
+0. `docs/EVIDENCE_AND_REVIEW.md`: NEW 2026-11-06. Standing evidence rules, cost-model sensitivity, known model flaws to fix, gaps vs Guy's rubric. Fix the flaws before the deck numbers are final.
 1. `docs/CASE_OFFICIAL.md`: official case numbers, rubric, judges, team state
 2. `docs/BUILD_PLAN.md`: locked decisions and the W1–W4 worker specs
 3. `docs/deck/DECK_CONTENT.md`: 9-slide content and demo voiceover script
