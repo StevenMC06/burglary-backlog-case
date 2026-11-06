@@ -41,13 +41,6 @@ const pct = (x) => (x * 100).toFixed(1) + "%";
 const shortId = (id) => id.replace(/^CC-/, "");
 const human = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).replace(/xx/gi, "XX")
   .replace(/\b(Nw|Ne|Sw|Se|Slu|Id)\b/g, (w) => w.toUpperCase());
-const prov = (kind, label) => h("span", { class: "prov " + kind }, label);
-const BAND = { strong: "pass", moderate: "weak", weak: "fail" };
-const bandLabel = (b) => (b ? b[0].toUpperCase() + b.slice(1) : "");
-function meter(score, band) {
-  return h("span", { class: "meter " + (BAND[band] || ""), role: "img", "aria-label": `Solvability ${Math.round(score)} of 100, ${band}` },
-    h("i", { style: `width:${Math.max(2, Math.min(100, score)).toFixed(0)}%` }));
-}
 // ---------------------------------------------------------------- motion
 // Web Animations API directly (what motion.dev wraps), so no library or CDN. Short and interruptible;
 // skipped for prefers-reduced-motion and where element.animate is missing (tests, old browsers).
@@ -119,7 +112,6 @@ function renderQueue() {
       const btn = h("button", { type: "button", class: "qbtn", "data-id": c.id, "aria-current": String(S.current?.case.id === c.id), onclick: () => selectCase(c.id) },
         h("span", { class: "l1" }, h("span", { class: "qid" }, c.id),
           sv ? h("span", { class: "qscore", title: `Solvability ${sv.score.toFixed(0)}/100 · ${sv.band}` }, sv.score.toFixed(0)) : null),
-        sv ? meter(sv.score, sv.band) : null,
         h("span", { class: "l2" }, human(c.block)),
         h("span", { class: "l3" }, human(c.neighborhood)),
         (c.flags.series_id || c.flags.pawn_hit === "exact_serial_lead") ? h("span", { class: "flags" },
@@ -180,23 +172,23 @@ function renderCase() {
       h("h2", {}, c.id, h("span", { class: "case-status" }, human(c.status.kind))),
       h("div", { class: "address" }, `${human(c.block)} · ${human(c.neighborhood)} · Beat ${c.beat}`)),
     h("dl", { class: "summary" },
-      h("div", { class: "sum score " + (BAND[s.band] || "") },
+      h("div", { class: "sum score" },
         h("dt", {}, "Solvability"),
-        h("dd", {}, h("b", {}, s.score.toFixed(0)), h("span", { class: "of" }, "/100 "), h("span", { class: "band" }, bandLabel(s.band)))),
-      h("div", { class: "sum" + (lead ? " good" : "") },
+        h("dd", {}, h("b", {}, s.score.toFixed(0)), h("span", { class: "of" }, "/100"))),
+      h("div", { class: "sum" },
         h("dt", {}, "Property"),
         h("dd", {}, lead ? h("span", { class: "mono" }, lead.match.pawn_id) : "No serial lead")),
-      h("div", { class: "sum" + (d.series_id ? " good" : "") },
+      d.series_id ? h("div", { class: "sum" },
         h("dt", {}, "Series"),
-        h("dd", {}, d.series_id || "Not linked")),
+        h("dd", {}, d.series_id)) : null,
       winH != null ? h("div", { class: "sum" },
         h("dt", {}, "Offense window"),
         h("dd", {}, `${winH.toFixed(0)} h`)) : null));
   fill(box, 
-    h("section", { class: "case-section" }, h("div", { class: "section-head" }, h("h2", {}, "Report"), prov("src", "Source record")),
+    h("section", { class: "case-section" }, h("h2", {}, "Report"),
       h("p", { class: "narr" }, c.narrative),
       h("p", { class: "report-time" }, `Offense window · ${fmtTime(c.window_start)} – ${fmtTime(c.window_end)}`)),
-    h("section", { class: "case-section" }, h("div", { class: "section-head" }, h("h2", {}, "Property"), prov("rule", "Rules engine")),
+    h("section", { class: "case-section" }, h("h2", {}, "Property"),
       d.pawn.filter((p) => p.match.status !== "rejected_conflicting_serial").map(pawnCard),
       d.pawn.some((p) => p.match.status !== "rejected_conflicting_serial") ? null : h("p", { class: "empty" }, "No pawn leads."),
       d.pawn.some((p) => p.match.status === "rejected_conflicting_serial") ?
@@ -248,8 +240,7 @@ function stepItem(st, i, d) {
   const done = S.decided[key];
   const li = h("li", { class: "step " + (done ? done.kind : "") });
   const body = h("div", {}, h("div", { class: "step-title" }, st.step),
-    h("div", { class: "step-meta" }, st.source === "engine" ? prov("rule", "Rules engine") : prov("ai", "AI suggested · " + st.source), h("span", {}, `~${st.est_minutes} min`)),
-    h("details", { class: "step-details" }, h("summary", {}, "Why this step"),
+    h("details", { class: "step-details" }, h("summary", {}, `${st.est_minutes} min · Details`),
       h("p", {}, st.why), h("p", {}, st.lawful_basis_note), h("p", {}, "Source: " + st.source)));
   li.append(body);
   const btns = h("div", { class: "btns" });
@@ -291,7 +282,7 @@ function renderPacket() {
   const d = S.current, pane = $("pane-packet");
   const pk = d.recorded.packet_writer, tr = d.recorded.triage;
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions · you decide each one`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Suggested actions"), h("span", {}, `${d.next_steps.length} actions`)),
     tr ? null : h("p", { class: "ai-missing" }, "From case rules · No recorded triage"),
     h("ul", { class: "steps" }, d.next_steps.map((s, i) => stepItem(s, i, d))),
     h("details", { class: "disclosure" }, h("summary", {}, "Lead packet"),
@@ -379,13 +370,13 @@ function renderSeries() {
     } catch (e) { toast(e.message); approve.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "section-head" }, sel, prov("rule", "Rules engine")),
+    h("div", { class: "row-flex" }, sel),
     h("div", { class: "kv" }, ser.rationale),
     ser.cleared ? h("div", { class: "kv" }, `Cleared by arrest: ${ser.cleared.case_id} · ${ser.cleared.arrestee_ref}`) : null,
     mapSvg(ser), h("p", { class: "map-key" }, "Blue: inbox · Red: conflict · Green ring: cleared"), timelineSvg(ser),
     h("h3", {}, "Link checks"),
     h("ul", { class: "checks" }, v.checks.map((c) => h("li", {}, h("span", { class: "chip " + (c.verdict === "pass" ? "pass" : c.verdict === "weak" ? "weak" : "fail") }, (c.verdict === "pass" ? "PASS " : c.verdict === "weak" ? "WEAK " : "FAIL ") + c.name.replace(/_/g, " ")), h("span", { class: "kv" }, c.reason)))),
-    h("details", { class: "disclosure" }, h("summary", {}, "Independent review (AI skeptic)"),
+    h("details", { class: "disclosure" }, h("summary", {}, "Independent review"),
       ser.skeptic && sk ? h("p", { class: "kv" }, sk.reasons_with_citations) : missing("the independent review")),
     h("div", { class: "row-flex" }, approve),
     v.verdict === "fail" ? h("p", { class: "kv" }, "Approval blocked by failed link checks.") : null
@@ -409,9 +400,9 @@ function renderVictim() {
     } catch (e) { toast(e.message); btn.disabled = false; }
   };
   fill(pane, 
-    h("div", { class: "section-head" }, h("h2", {}, "Victim update"), rec ? prov("ai", `AI draft · ${lang.toUpperCase()}`) : prov("rule", `Template · ${lang.toUpperCase()}`)),
+    h("div", { class: "section-head" }, h("h2", {}, "Victim update"), h("span", {}, `Draft · ${lang.toUpperCase()}`)),
     rec ? null : h("p", { class: "kv" }, "Standard template · No recorded draft"),
-    h("div", { class: "packet-text draft", lang: lang }, msg),
+    h("div", { class: "packet-text", lang: lang }, msg),
     rec?.output.plain_english_summary ? h("div", { class: "kv" }, "English summary: " + rec.output.plain_english_summary) : null,
     h("div", { class: "kv" }, "Approval is recorded. Delivery is not connected."),
     h("div", { class: "row-flex" }, btn)
