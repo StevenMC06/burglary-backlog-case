@@ -16,4 +16,4 @@ Two separate reviewers examined the code and found additional edge cases, which 
 ## What this does not establish
 Actors remain demo identities, not authenticated officers. The log is tamper-evident, not immutable. Step decisions are case-bound, not bound to versioned recommendation IDs. Multi-file writes are not transactional, and simultaneous processes are not coordinated. These changes do not prove AI accuracy, clearance uplift, or savings.
 
-Branch: steven/review-safeguards. Changes are local, uncommitted and unpushed. Algorithm and UI work were left to their existing owners.
+Branch: steven/review-safeguards. Published for review on this branch; not merged into main. Algorithm and UI work were left to their existing owners.
