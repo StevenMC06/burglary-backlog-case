@@ -6,13 +6,13 @@
 <title>Casefile · How the engine works</title>
 <link rel="icon" href="data:,">
 <style>
-:root { --bg:#f5f6f8; --panel:#fff; --ink:#202936; --muted:#657080; --line:#e3e6eb; --navy:#182534; --accent:#245ab5;
-  --pass:#276345; --pass-bg:#edf6f1; --weak:#805d16; --fail:#a23c34; --fail-bg:#fff0ef; --info-bg:#edf3ff; }
+:root { --bg:#e4ebe6; --panel:#fafcfa; --ink:#16131f; --muted:#555c58; --line:#d5ddd7; --navy:#16131f; --accent:#6425ff;
+  --pass:#0f6a2e; --pass-bg:#d4f9de; --weak:#6a5500; --fail:#b01836; --fail-bg:#ffe0e5; --info-bg:#ebe3ff; }
 * { box-sizing: border-box; }
 body { margin:0; font:14px/1.55 "Segoe UI", system-ui, sans-serif; color:var(--ink); background:var(--bg); }
 header { background:var(--navy); color:#fff; padding:18px 28px; display:flex; align-items:center; gap:20px; }
 header h1 { margin:0; font-size:19px; font-weight:650; }
-header a { color:#b9c5d3; margin-left:auto; font-size:13px; }
+header a { color:#a9a6b8; margin-left:auto; font-size:13px; }
 nav.toc { display:flex; flex-wrap:wrap; gap:8px; padding:14px 28px 0; }
 nav.toc a { font-size:12px; padding:5px 10px; border:1px solid var(--line); background:#fff; border-radius:999px; color:var(--ink); text-decoration:none; }
 main { max-width:1180px; margin:0 auto; padding:18px 28px 60px; display:grid; gap:20px; }
@@ -32,13 +32,13 @@ label.s b { color:var(--ink); text-align:right; font-variant-numeric: tabular-nu
 .stat span { font-size:20px; font-weight:650; font-variant-numeric: tabular-nums; }
 button { font:inherit; font-size:12px; font-weight:600; padding:6px 12px; border:1px solid var(--line); background:#fff; border-radius:5px; cursor:pointer; }
 button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-canvas, svg.fig { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#fbfcfd; }
+canvas, svg.fig { width:100%; display:block; border:1px solid var(--line); border-radius:6px; background:#f6f9f7; }
 .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:8px; }
 .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
 .mono { font-family: Consolas, ui-monospace, monospace; font-size:12px; }
 .heap { display:flex; gap:6px; flex-wrap:wrap; min-height:34px; }
 .heap div { padding:4px 8px; border-radius:5px; background:var(--info-bg); color:var(--accent); font-size:12px; font-variant-numeric: tabular-nums; }
-.log { height:150px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:6px 8px; background:#fbfcfd; }
+.log { height:150px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:6px 8px; background:#f6f9f7; }
 .log div { font-size:12px; } .log .skip { color:var(--muted); } .log .push { color:var(--pass); } .log .drop { color:var(--weak); }
 .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
 .card { border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:12px; transition: all .25s; }
@@ -48,19 +48,67 @@ canvas, svg.fig { width:100%; display:block; border:1px solid var(--line); borde
 .toggle { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
 .toggle button { border:0; border-radius:0; }
 .toggle button.on { background:var(--navy); color:#fff; }
+nav.toc a.lvl { background:var(--navy); color:#fff; border-color:var(--navy); }
+.plain { padding:30px 32px; }
+.kicker { margin:0 0 6px; font-size:12px; font-weight:650; letter-spacing:.6px; text-transform:uppercase; color:var(--accent); }
+.hero-title { font-size:22px !important; line-height:1.35; font-weight:650; max-width:900px; margin:0 0 22px !important; letter-spacing:-.3px; }
+.steps { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; counter-reset:s; }
+@media (max-width: 900px) { .steps { grid-template-columns:1fr 1fr; } }
+.step { position:relative; border:1px solid var(--line); border-radius:8px; padding:16px 16px 14px; background:#f6f9f7; }
+.step:not(:last-child)::after { content:"→"; position:absolute; right:-13px; top:38%; color:var(--muted); font-size:16px; }
+.step .num { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--navy); color:#fff; font-size:13px; font-weight:650; }
+.step h3 { margin:8px 0 4px; font-size:15px; }
+.step p, .plain-card p { margin:0; font-size:13.5px; color:#2f2b3a; }
+.plain-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; margin-top:14px; }
+@media (max-width: 760px) { .plain-grid { grid-template-columns:1fr; } }
+.plain-card { border-left:3px solid var(--accent); padding:10px 14px; background:var(--info-bg); border-radius:0 8px 8px 0; }
+.plain-card h3 { margin:0 0 4px; font-size:14px; }
+.depth { margin:18px 0 0; font-size:13px; color:var(--muted); }
+#math h3 { margin:26px 0 6px; font-size:15px; padding-top:14px; border-top:1px solid var(--line); }
+#math h3:first-of-type { border-top:0; }
+#math p, #math li { max-width:900px; }
+#math .note { color:var(--muted); font-size:13px; }
+#math .proof { border-left:3px solid var(--pass); background:var(--pass-bg); padding:8px 14px; border-radius:0 6px 6px 0; margin:8px 0; font-size:13.5px; }
+#math table { border-collapse:collapse; font-size:13px; margin:8px 0; }
+#math td, #math th { border:1px solid var(--line); padding:4px 10px; text-align:left; font-variant-numeric:tabular-nums; }
+#math th { background:#e9efea; }
+#math .katex-display { overflow-x:auto; overflow-y:hidden; padding:4px 0; }
+.mtoc { columns:3; font-size:13px; margin:6px 0 0; padding-left:18px; }
+@media (max-width: 760px) { .mtoc { columns:1; } }
 </style>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
 <header>
   <h1>How the Casefile engine works</h1>
-  <span style="color:#b9c5d3;font-size:13px">Interactive · same formula and constants as <span class="mono">crates/core</span></span>
+  <span style="color:#a9a6b8;font-size:13px">Interactive · same formula and constants as <span class="mono">crates/core</span></span>
   <a href="./">← back to the console</a>
 </header>
 <nav class="toc">
+  <a href="#plain" class="lvl">Start here: plain English</a>
   <a href="#score">1 · Pair score</a><a href="#sweep">2 · Time sweep</a><a href="#bound">3 · Upper-bound pruning</a>
   <a href="#clusters">4 · Union-find clusters</a><a href="#topk">5 · Top-k heap</a><a href="#pawn">6 · Pawn index</a><a href="#bench">7 · Benchmark</a>
+  <a href="#math" class="lvl">Full math ∑</a>
 </nav>
 <main>
+
+<section id="plain" class="plain">
+  <p class="kicker">In plain English · 1 minute</p>
+  <h2 class="hero-title">Casefile helps detectives spot burglaries that were probably done by the same person, and checks every guess before a human sees it.</h2>
+  <div class="steps">
+    <div class="step"><span class="num">1</span><h3>Read</h3><p>An AI reads each burglary report and writes down <b>how</b> it happened: which door, what tool, what time of day, what was taken.</p></div>
+    <div class="step"><span class="num">2</span><h3>Compare</h3><p>Every pair of burglaries gets a <b>similarity score from 0 to 1</b>. Same method, close together and close in time means a high score.</p></div>
+    <div class="step"><span class="num">3</span><h3>Fact-check</h3><p>A plain calculator, not the AI, asks hard questions. <b>Could one person physically get from one scene to the other in time?</b> If not, the link is thrown out.</p></div>
+    <div class="step"><span class="num">4</span><h3>Detective decides</h3><p>Only what survives reaches a detective, as a checklist. They accept or reject each step, and <b>every decision is logged</b> so it can be replayed later.</p></div>
+  </div>
+  <div class="plain-grid">
+    <div class="plain-card"><h3>Stolen property</h3><p>If a stolen laptop's serial number shows up at a pawn shop, that's a <b>lead, not proof</b>. Look-alike laptops with a different serial are rejected automatically.</p></div>
+    <div class="plain-card"><h3>Why not just ask an AI?</h3><p>On the same 150 made-up cases, one big AI model was as accurate as we were. But it accepted <b>9 links that were physically impossible</b>. Ours accepted <b>0</b>. Checking travel time is arithmetic, and that's what calculators are for.</p></div>
+    <div class="plain-card"><h3>Fast, and the same answer every time</h3><p>We made the engine <b>16 to 54 times faster</b>, then proved the fast version gives <b>exactly</b> the same answers as the slow, obvious version. Same inputs, same output, every run.</p></div>
+    <div class="plain-card"><h3>What we don't claim</h3><p>All data here is synthetic. A link is a reason to look, never a reason to arrest. Whether it saves time and solves cases has to be measured in a real pilot.</p></div>
+  </div>
+  <p class="depth">Want to see it move? <a href="#score">Play with each step below ↓</a> · Want every formula and proof? <a href="#math">Jump to the full math ∑</a></p>
+</section>
 
 <section id="score">
   <h2>1 · Pair score: how likely two burglaries share an offender</h2>
@@ -110,7 +158,7 @@ canvas, svg.fig { width:100%; display:block; border:1px solid var(--line); borde
       <p style="font-size:12px;color:var(--muted)">On the real 2,000-case seed set at threshold 0.9, only <b>68,781 of 1,999,000</b> pairs (3.4%) reach MO scoring; 761 become edges.</p>
     </div>
     <div><canvas id="b-canvas" width="760" height="380"></canvas>
-      <div class="legend"><span><i style="background:rgba(101,112,128,.5)"></i>pruned by the bound (no MO work)</span><span><i style="background:#245ab5"></i>MO scored, below threshold</span><span><i style="background:#276345"></i>edge</span><span><i style="background:#dce7fa"></i>region the bound keeps</span></div></div>
+      <div class="legend"><span><i style="background:rgba(85,92,88,.5)"></i>pruned by the bound (no MO work)</span><span><i style="background:#6425ff"></i>MO scored, below threshold</span><span><i style="background:#0f6a2e"></i>edge</span><span><i style="background:#ebe3ff"></i>region the bound keeps</span></div></div>
   </div>
 </section>
 
@@ -156,9 +204,128 @@ canvas, svg.fig { width:100%; display:block; border:1px solid var(--line); borde
   <h2>7 · Measured speed-up (same output, checked)</h2>
   <p class="lead">From <span class="mono">casefile bench</span>: brute-force reference vs optimised path on the seed data tiled 1×, 2×, 4×. Log scale. Every row's optimised output was compared with the reference and was identical.</p>
   <svg class="fig" id="bench-svg" viewBox="0 0 1100 330"></svg>
-  <div class="legend"><span><i style="background:#c3cad4"></i>brute-force reference</span><span><i style="background:var(--accent)"></i>optimised</span></div>
+  <div class="legend"><span><i style="background:#c9d2cc"></i>brute-force reference</span><span><i style="background:var(--accent)"></i>optimised</span></div>
+</section>
+
+<section id="math">
+  <p class="kicker">Fully geeked out</p>
+  <h2>The full math</h2>
+  <p class="lead">Every formula the engine runs, with the constants from the source (<span class="mono">crates/core/src</span>), the proofs that the fast paths are exact, complexity bounds, and the cost model worked through on the base scenario. All weights are hand-set and pinned by unit tests, not fitted to real data.</p>
+  <ol class="mtoc">
+    <li><a href="#m-dist">Distance and time</a></li><li><a href="#m-mo">MO similarity</a></li><li><a href="#m-pair">Pair score</a></li>
+    <li><a href="#m-ub">Upper bound and its proof</a></li><li><a href="#m-region">Pruning region</a></li><li><a href="#m-sweep">Sweep: how many pairs</a></li>
+    <li><a href="#m-uf">Union-find and re-split</a></li><li><a href="#m-topk">Top-k heap</a></li><li><a href="#m-verify">Verifier rules</a></li>
+    <li><a href="#m-pawn">Pawn rules and index proof</a></li><li><a href="#m-solv">Solvability score</a></li><li><a href="#m-eval">Evaluation metrics</a></li>
+    <li><a href="#m-cost">Cost and clearance model</a></li><li><a href="#m-audit">Audit hash chain</a></li><li><a href="#m-cx">Complexity summary</a></li>
+  </ol>
+
+  <h3 id="m-dist">M1 · Distance and time between two cases</h3>
+  <p>Great-circle distance (haversine, mean Earth radius \(R = 6371.0088\) km), for case locations \((\varphi_a,\lambda_a)\), \((\varphi_b,\lambda_b)\) in radians:</p>
+  $$h = \sin^2\!\frac{\varphi_b-\varphi_a}{2} + \cos\varphi_a\cos\varphi_b\,\sin^2\!\frac{\lambda_b-\lambda_a}{2}, \qquad d(a,b) = 2R\arcsin\sqrt{h}$$
+  <p>Each report has an offense window \([s, e]\) (the victim was away). Time apart uses window midpoints:</p>
+  $$\mu_a = \tfrac{1}{2}(s_a + e_a), \qquad t(a,b) = \frac{|\mu_a - \mu_b|}{86\,400}\ \text{days}$$
+
+  <h3 id="m-mo">M2 · MO similarity \(m(a,b) \in [0,1]\)</h3>
+  $$m = 0.20\,\mathbb{1}[\text{premise}] + 0.15\,\mathbb{1}[\text{entry pt}] + 0.15\,\mathbb{1}[\text{method}] + 0.10\,\mathbb{1}[\text{time band}] + 0.05\,\mathbb{1}[\text{weekday}] + 0.15\,J(P_a,P_b) + 0.20\,J(S_a,S_b)$$
+  <p>\(\mathbb{1}[\cdot]\) is 1 only for an exact match on a <i>known</i> value (Unknown never agrees). \(P\) = property types taken, \(S\) = behavioural signatures (trimmed, case-insensitive). Weights sum to 1. A missing MO on either side gives \(m = 0\).</p>
+  $$J(A,B) = \frac{|A\cap B|}{|A\cup B|} = \frac{|A\cap B|}{|A|+|B|-|A\cap B|}, \qquad J(\varnothing,\varnothing) := 0$$
+  <p class="note">Fast path: the 12 property types become a 12-bit mask, so \(J = \operatorname{popcount}(a \wedge b) / \operatorname{popcount}(a \vee b)\). Signatures are interned to sorted integer ids, and \(|S_a \cap S_b|\) is a linear merge walk. Same integers, same division, so the result is bit-identical to the set version.</p>
+
+  <h3 id="m-pair">M3 · Pair score</h3>
+  $$z(a,b) = -0.4 + 6.0\,m \;-\; 1.3\ln(1+d) \;-\; 0.9\ln(1+t) \;+\; 0.6\,\min(\sigma_{ab}, 3)$$
+  $$\text{score}(a,b) = \begin{cases} \sigma(z) &amp; \text{both cases have an MO} \\ 0.5\,\sigma(z) &amp; \text{otherwise} \end{cases} \qquad \sigma(z) = \frac{1}{1+e^{-z}}$$
+  <p>\(\sigma_{ab} = |S_a \cap S_b|\) is the number of shared signatures. Log terms make decay steepest near zero distance and zero days (distance decay and temporal proximity in the burglary-linkage literature). Without an MO the best possible score is \(0.5\,\sigma(-0.4) \approx 0.2007\), so it can never pass 0.5. The score is exactly symmetric: components are computed in id order.</p>
+  <table><tr><th>pair</th><th>m</th><th>d</th><th>t</th><th>σ</th><th>z</th><th>score</th></tr>
+    <tr><td>same offender (unit test)</td><td>.85</td><td>1 km</td><td>14 d</td><td>1</td><td>1.96</td><td>.88</td></tr>
+    <tr><td>unrelated (unit test)</td><td>.25</td><td>8 km</td><td>90 d</td><td>0</td><td>−5.82</td><td>.003</td></tr></table>
+
+  <h3 id="m-ub">M4 · The upper bound, and why skipping is exact</h3>
+  <p>Distance and time are cheap. The MO comparison is the expensive part. Before doing it, bound the score using only \(d\), \(t\) and list lengths:</p>
+  $$\mathrm{UB}(a,b) = \sigma\!\Big(5.6 - 1.3\ln(1+d) - 0.9\ln(1+t) + 0.6\min\big(|S_a|, |S_b|, 3\big)\Big)$$
+  <div class="proof"><b>Claim.</b> \(\text{score}(a,b) \le \mathrm{UB}(a,b)\), so \(\mathrm{UB} \lt \theta \Rightarrow \text{score} \lt \theta\) and the pair can be skipped without changing the edge set.<br>
+  <b>Proof.</b> \(z\) is affine in \(m\) and in \(\min(\sigma_{ab},3)\), with positive coefficients 6.0 and 0.6. Also \(m \le 1\) (the weights sum to 1 and each indicator and Jaccard term is at most 1) and \(\sigma_{ab} \le \min(|S_a|,|S_b|)\). So \(z \le -0.4 + 6.0 + (\dots) = z_{\mathrm{UB}}\). \(\sigma\) is increasing, and the no-MO factor \(0.5 \le 1\) only lowers the score. In floating point, both sides use the same operations in the same order, and IEEE-754 addition and multiplication by a positive constant are monotone, so the inequality survives rounding. ∎</div>
+  <p class="note">Measured on the 2,000-case seed set at \(\theta = 0.9\): 1,461,811 pairs inside the time window, 68,781 pass the bound (4.7% of them; 3.4% of all \(\binom{2000}{2}\) pairs), 761 become edges.</p>
+
+  <h3 id="m-region">M5 · The pruning region in closed form</h3>
+  <p>Setting \(\mathrm{UB} = \theta\) and solving gives the boundary curve. A pair is scored only if it lies inside:</p>
+  $$1.3\ln(1+d) + 0.9\ln(1+t) \;\le\; 5.6 + 0.6\min(|S_a|,|S_b|,3) - \operatorname{logit}\theta, \qquad \operatorname{logit}\theta = \ln\frac{\theta}{1-\theta}$$
+  <p>At \(\theta = 0.9\) (\(\operatorname{logit} = 2.197\)) with one signature, the right side is 4.003. That gives a maximum distance of \(e^{4.003/1.3}-1 \approx 20.7\) km at zero days, and a maximum gap of \(e^{4.003/0.9}-1 \approx 84.5\) days at zero distance. In \((\ln(1+d), \ln(1+t))\) coordinates the region is a triangle; in \((d,t)\) it is the convex-down curve in panel 3.</p>
+
+  <h3 id="m-sweep">M6 · Time sweep: how many pairs it visits</h3>
+  <p>Sort cases by \(\mu\). For case \(i\), scan forward and stop at the first \(j\) with \(\mu_j - \mu_i \gt W\) (\(W = 180\) days). Every later case is further away, so nothing is missed. The cost is \(O(n\log n + P_W)\), where \(P_W\) is the number of pairs within \(W\). If offense times are spread roughly uniformly over a span \(T\):</p>
+  $$\Pr\big[|\mu_a-\mu_b| \le W\big] = 1 - \Big(1 - \frac{W}{T}\Big)^2 \quad\Rightarrow\quad P_W \approx \binom{n}{2}\Big[\,2\tfrac{W}{T} - \big(\tfrac{W}{T}\big)^2\Big]$$
+  <p>Seed data: \(W/T \approx 180/365\) predicts 74.3%; measured 1,461,811 / 1,999,000 = 73.1%. For a multi-year archive (\(T \gg W\)) the share falls like \(2W/T\): 23% at 4 years, 6.5% at 15 years. That's where the sweep pays off most. A \(30\) km bounding box runs next; on a city-sized dataset it removes nothing (honest null).</p>
+
+  <h3 id="m-uf">M7 · Union-find components and re-split</h3>
+  <p>Graph \(G_\theta = (V, E_\theta)\), \(E_\theta = \{(a,b) : \text{score}(a,b) \ge \theta\}\). Candidate series are the connected components of size \(\ge 2\), found with a disjoint-set forest using path halving (\(x \leftarrow \text{parent}(\text{parent}(x))\)), where the smaller index becomes the root so results don't depend on edge order. A component \(C\) with \(|C| \gt 15\) is treated as chaining (A~B, B~C, … without A~C) and re-split on \(G_{\theta+0.05}[C]\), recursively:</p>
+  $$\text{split}(C, \theta) = \begin{cases} \{C\} &amp; |C| \le 15 \\ \varnothing &amp; \theta + 0.05 \gt 0.995 \\ \bigcup_{C' \in \text{comp}(G_{\theta+0.05}[C])} \text{split}(C', \theta+0.05) &amp; \text{otherwise} \end{cases}$$
+  <p>The depth is at most \(\lceil (0.995-\theta)/0.05 \rceil\): 2 levels at \(\theta = 0.9\). Thresholds only rise, so edges only disappear, and a re-split never merges. Output ids \(S\text{-}1, S\text{-}2, \dots\) follow each group's smallest case id, which makes the result deterministic.</p>
+
+  <h3 id="m-topk">M8 · Top-k similar cases with branch-and-bound</h3>
+  <p>Rank candidates by the total order \((\text{score}\downarrow, \text{id}\uparrow)\). Keep a min-heap \(H\) of the best \(k\) seen so far: \(O(n\log k)\) time, \(O(k)\) memory, versus \(O(n\log n)\) for a full sort.</p>
+  <div class="proof"><b>Cut.</b> If \(|H| = k\) and \(\mathrm{UB}(q,c) \lt \min H\), then \(\text{score}(q,c) \le \mathrm{UB} \lt \min H\), so \(c\) can never enter the heap (it would also lose any tie, because the inequality is strict). Skipping its MO work leaves the result unchanged. ∎</div>
+
+  <h3 id="m-verify">M9 · The verifier (yes/no rules)</h3>
+  <p><b>Hard: spatiotemporal feasibility</b>, for every pair in a proposed series. One offender travelling at \(v = 40\) km/h door to door, needing at least 10 minutes on scene:</p>
+  $$\underbrace{\frac{\max(e_b - s_a,\; e_a - s_b,\; 0)}{60}}_{\text{best-case minutes available}} \;\ge\; \underbrace{\frac{60\,d(a,b)}{40} + 10}_{\text{minutes needed}} \qquad\text{else } \textbf{FAIL}$$
+  <p class="note">Demo decoy: 15.9 km apart, 30 min available, \(60 \cdot 15.9/40 + 10 = 33.9\) min needed, so it fails. The windows give the most generous ordering, so FAIL means impossible even in the best case.</p>
+  <p><b>Hard: conflicting clearance.</b> Two cases cleared by arrest of different people fail: one offender can't be two arrestees.<br>
+  <b>Soft: MO consistency.</b> \(\bar m = \binom{|C|}{2}^{-1}\sum_{a\lt b} m(a,b)\): below 0.35 fails (soft), below 0.55 is weak.<br>
+  <b>Soft: property.</b> Some property type must recur in at least two cases, else weak. <b>Soft: spread.</b> \(\max d \gt 12\) km is weak (burglars commute short).<br>
+  <b>Verdict</b> = FAIL if any hard check fails; else WEAK if any soft check is weak or failed; else PASS. For each hard conflict, the case with the lower mean pair score to the rest is named as the one to drop.</p>
+
+  <h3 id="m-pawn">M10 · Pawn matching rules, and why the index is complete</h3>
+  <p>Serial normalisation: \(\nu(x)\) = uppercase, keep \([A\text{-}Z0\text{-}9]\) only (O and 0, I and 1 are <i>not</i> merged). For an item \(i\) and a pawn record \(p\) received after the offense window started:</p>
+  $$\text{match}(i,p) = \begin{cases} \text{exact serial lead} &amp; \nu_i,\nu_p \text{ present},\ \nu_i = \nu_p \\ \text{rejected: conflicting serial} &amp; \nu_i \ne \nu_p,\ \text{same category} \\ \varnothing &amp; \nu_i \ne \nu_p,\ \text{different category} \\ \text{review: shared marking} &amp; \text{else if } M_i \cap M_p \ne \varnothing \\ \text{unresolved similar} &amp; \text{else if same category and (brand}\wedge\text{model ok, or } J_{\text{tokens}} \ge 0.5) \\ \varnothing &amp; \text{otherwise} \end{cases}$$
+  <div class="proof"><b>Lemma.</b> \(\text{match}(i,p) \ne \varnothing \Rightarrow p \in \mathcal{B}_{\text{cat}}(c_i) \cup \mathcal{B}_{\text{serial}}(\nu_i) \cup \bigcup_{x\in M_i}\mathcal{B}_{\text{mark}}(x)\).<br>
+  <b>Proof by cases.</b> An exact lead has \(\nu_p = \nu_i\), so it is in the serial bucket. A conflicting serial requires the same category, so it is in the category bucket. A shared marking puts it in a marking bucket. "Unresolved similar" requires the same category. Every other branch returns \(\varnothing\). ∎<br>
+  So the index compares each item only with the union of its buckets, visited in record order, and returns exactly what brute force returns (fuzz-tested on all four outcomes).</div>
+  <p class="note">Brute force: \(|I|\cdot|P| = 5{,}117 \times 1{,}500 \approx 7.7\)M comparisons, each re-normalising strings. Indexed: normalise once, then \(\sum_i |\text{buckets}(i)|\), about \(|I|\cdot|P|/12\) for 12 roughly balanced categories. Measured: 5.26 s → 98 ms.</p>
+
+  <h3 id="m-solv">M11 · Solvability score (queue order)</h3>
+  $$\text{solv} = 100\,\sigma\Big(-1.0 + 0.9x_{\text{wit}} + 0.8x_{\text{susp}} + 0.6x_{\text{veh}} + 0.7x_{\text{video}} + 0.5x_{\text{phys}} + 0.4x_{\text{trace}} - 0.3\ln(1+h) + 0.5x_{\text{series}} + 1.2x_{\text{pawn}}\Big)$$
+  <p>The \(x\) terms are 0/1 facts and \(h\) is the window length in hours. Bands: below 25 weak, below 55 moderate, else strong. Each factor's contribution is computed by adding terms one at a time, \(\Delta_k = 100[\sigma(z_{k}) - \sigma(z_{k-1})]\), so contributions sum exactly to score − baseline. Hand-set to follow the direction of the solvability literature; this is not a calibrated probability.</p>
+
+  <h3 id="m-eval">M12 · Evaluation metrics (synthetic ground truth)</h3>
+  <p>With \(\Pi\) the true same-series pairs and \(\hat\Pi\) the predicted ones:</p>
+  $$P = \frac{|\hat\Pi\cap\Pi|}{|\hat\Pi|}, \quad R = \frac{|\hat\Pi\cap\Pi|}{|\Pi|}, \quad F_1 = \frac{2PR}{P+R}, \quad \text{series } S \text{ recovered} \iff \max_{\hat C} J(S, \hat C) \ge 0.5$$
+  <table><tr><th>θ</th><th>P</th><th>R</th><th>F1</th><th>series</th></tr><tr><td>0.9</td><td>66%</td><td>100%</td><td>79%</td><td>38/40</td></tr><tr><td>0.95</td><td>83%</td><td>96%</td><td>89%</td><td>35/40</td></tr></table>
+  <p class="note">Single LLM vs Casefile on the same cases (n = 20 / 60 / 150): F1 100/67/86 vs 80/69/86; decoy pairs accepted by the LLM 0/6/9, by Casefile 0. The generator and engine share features, so these are method checks, not production accuracy.</p>
+
+  <h3 id="m-cost">M13 · Cost and clearance model (base scenario, worked)</h3>
+  <p>Official baseline: \(N = 10{,}000\) cases/yr, 13% cleared, detective \$70/h, officer \$50/h, labour \$3.05M. Base inputs (assumptions): adoption \(a = .85\), screened share .40 at 30 min instead of 90, packet saves 20 min, evidence saves 10 officer-min.</p>
+  $$\text{gross} = \underbrace{\tfrac{1}{60}\big[3{,}400(90-30) + 5{,}100\cdot 20\big]}_{5{,}100\ \text{det-h}}\cdot 70 + \underbrace{\tfrac{8{,}500\cdot 10}{60}}_{1{,}416.7\ \text{off-h}}\cdot 50 = \$427{,}833$$
+  $$L = \underbrace{1{,}300\cdot .30\cdot 1.5\cdot a}_{\text{linkage } 497.25} + \underbrace{N\cdot .35\cdot .10\cdot a\cdot(1-.20)}_{\text{property } 238} + \underbrace{120\,a}_{\text{triage } 102} = 837.25 \text{ new leads}$$
+  $$\Delta\text{clearances} = L\cdot\underbrace{.65}_{\text{complete}}\cdot\underbrace{.50}_{\text{convert}} - \underbrace{10}_{\text{screening loss}} = 262.1 \quad(\text{target } 325)$$
+  $$\text{false leads} = (497.25+238)\Big(\frac{1}{.80}-1\Big) = 183.8, \qquad \text{work} = \underbrace{544.2\cdot 2\,\text{h}\cdot 70}_{\$76{,}190} + \underbrace{183.8\cdot\tfrac{20}{60}\cdot 70}_{\$4{,}289}$$
+  $$\text{steady net} = 427{,}833 - \underbrace{62{,}000}_{\text{recurring}} - 80{,}479 = \$285{,}355 \;(9.36\%,\ \text{target } 15\%)$$
+  $$\text{year one} = .65\cdot 427{,}833 - 62{,}000 - 80{,}479 - \underbrace{130{,}000}_{\text{one-time}} = +\$5{,}613$$
+  <p class="note">Dollars are freed capacity, not cash. Scenario brackets: conservative 2.09% / +44.5, optimistic 15.39% / +457.9. Only optimistic meets either target. To reach +325 with everything else fixed, conversion would need 61.56%.</p>
+
+  <h3 id="m-audit">M14 · Audit hash chain</h3>
+  $$h_0 = \text{"genesis"}, \qquad h_k = \operatorname{SHA\text{-}256}\big(h_{k-1} \,\Vert\, \operatorname{JSON}(e_k \setminus \text{hash})\big)$$
+  <p>Editing entry \(k\) changes \(h_k\) and breaks every later link, and <span class="mono">verify</span> reports the first bad sequence number. It is tamper-<i>evident</i>, not tamper-proof: someone who rewrites the whole file can recompute the chain, so production would anchor \(h_k\) externally.</p>
+
+  <h3 id="m-cx">M15 · Complexity summary</h3>
+  <table><tr><th>step</th><th>brute force</th><th>Casefile</th><th>measured (2,000 cases)</th></tr>
+    <tr><td>candidate series</td><td>\(O(n^2)\) pair scores, allocating</td><td>\(O(n\log n + P_W)\) cheap checks + \(O(P_{\mathrm{UB}})\) MO scores, threaded</td><td>222 → 13.5 ms (16.5×)</td></tr>
+    <tr><td>pawn matching</td><td>\(O(|I|\,|P|)\) with string work each time</td><td>\(O(|I| + |P|)\) normalise + \(O(\sum_i|\text{buckets}_i|)\)</td><td>5.26 s → 98 ms (53.6×)</td></tr>
+    <tr><td>top-k similar</td><td>\(O(n\log n)\) sort</td><td>\(O(n\log k)\) heap + bound cut</td><td>24 → 12 ms per 50 lookups (2.0×)</td></tr>
+    <tr><td>components</td><td colspan="2">union-find over \(E_\theta\), path halving; at most 2 re-split levels at θ = .9</td><td>part of the above</td></tr></table>
+  <p class="note">Every fast path is checked against its brute-force reference: fuzz tests require identical output, and <span class="mono">casefile bench</span> re-checks at 1×, 2× and 4× scale.</p>
 </section>
 </main>
 <script src="algo.js"></script>
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script>
+window.addEventListener("load", () => {
+  if (!window.renderMathInElement) return; // math stays readable as TeX if the vendor files are missing
+  renderMathInElement(document.getElementById("math"), {
+    delimiters: [{ left: "$$", right: "$$", display: true }, { left: "\\(", right: "\\)", display: false }],
+    throwOnError: false,
+  });
+});
+</script>
 </body>
 </html>

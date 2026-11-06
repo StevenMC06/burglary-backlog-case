@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "img"
-INK, MUTED, LINE, ACCENT, PASS, FAIL, NAVY, REF = "#202936", "#657080", "#e3e6eb", "#245ab5", "#276345", "#a23c34", "#182534", "#c3cad4"
+INK, MUTED, LINE, ACCENT, PASS, FAIL, NAVY, REF = "#16131f", "#555c58", "#d5ddd7", "#6425ff", "#0f6a2e", "#b01836", "#16131f", "#c9d2cc"
 FONT = 'font-family="Segoe UI, Helvetica, Arial, sans-serif"'
 # crates/core/src/linkage.rs
 INTERCEPT, W_MO, W_DIST, W_TIME, W_SIG = -0.4, 6.0, -1.3, -0.9, 0.6
@@ -67,7 +67,7 @@ def funnel_svg(funnel):
     lo, hi = 0, math.log10(f[0])
     X = lambda v: x0 + (math.log10(max(v, 1)) - lo) / (hi - lo) * (x1 - x0)
     b = [f'<text x="20" y="30" font-size="17" font-weight="650">Pair funnel: 2,000 seed cases, threshold {th} (log scale)</text>']
-    colors = [REF, "#9fb3d6", "#9fb3d6", ACCENT, PASS]
+    colors = [REF, "#d2c2ff", "#d2c2ff", ACCENT, PASS]
     for i, (lab, v) in enumerate(zip(labels, f)):
         y = 56 + i * 44
         wd = X(v) - x0
@@ -92,7 +92,7 @@ def bound_svg():
         b.append(f'<line x1="{X(k)}" x2="{X(k)}" y1="{T}" y2="{T + ph}" stroke="{LINE}"/><text x="{X(k) - 12}" y="{T + ph + 18}" font-size="11" class="m">{k} km</text>')
     for d in range(0, 181, 30):
         b.append(f'<line x1="{L}" x2="{L + pw}" y1="{Y(d)}" y2="{Y(d)}" stroke="{LINE}"/><text x="{L - 36}" y="{Y(d) + 4}" font-size="11" class="m">{d} d</text>')
-    for i, (thr, sig, col) in enumerate(((0.5, 1, "#9fb3d6"), (0.9, 1, ACCENT), (0.9, 0, NAVY), (0.99, 0, FAIL))):
+    for i, (thr, sig, col) in enumerate(((0.5, 1, "#d2c2ff"), (0.9, 1, ACCENT), (0.9, 0, NAVY), (0.99, 0, FAIL))):
         c = INTERCEPT + W_MO + W_SIG * sig - math.log(thr / (1 - thr))
         pts = []
         for s in range(0, 401):
