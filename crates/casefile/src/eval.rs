@@ -20,7 +20,8 @@ use casefile_core::{linkage, property, verify, Dataset, GroundTruth, MatchStatus
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-const THRESHOLD: f64 = 0.6;
+/// Operating point picked from the sweep in the report (same synthetic data: optimistic).
+const THRESHOLD: f64 = 0.9;
 const SUBSET_SIZES: [usize; 3] = [20, 60, 150];
 
 type Pair = (String, String);
@@ -82,8 +83,12 @@ fn prf(pred: &[Vec<String>], truth: &[Vec<String>]) -> Prf {
 
 /// Engine clusters, then drop hard-failing cases flagged by verify_series (one pruning pass).
 fn casefile_groups(ds: &Dataset) -> (Vec<Vec<String>>, Vec<Vec<String>>) {
+    casefile_groups_at(ds, THRESHOLD)
+}
+
+fn casefile_groups_at(ds: &Dataset, threshold: f64) -> (Vec<Vec<String>>, Vec<Vec<String>>) {
     let raw: Vec<Vec<String>> =
-        linkage::propose_clusters(ds, THRESHOLD).into_iter().map(|h| h.case_ids).collect();
+        linkage::propose_clusters(ds, threshold).into_iter().map(|h| h.case_ids).collect();
     let mut pruned = vec![];
     for g in &raw {
         let v = verify::verify_series(ds, g);
@@ -208,6 +213,17 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         "| + verify_series pruning | {} | {} | {} | {}/{} |\n\nRuntime: {:.2} s for {} cases.\n\n",
         pct(pr_m.precision), pct(pr_m.recall), pct(pr_m.f1), pr_m.series_recovered, pr_m.series_total, secs, ds.cases.len()
     ));
+    // Threshold sweep: the operating point is a precision/recall choice, so show the curve.
+    md.push_str("Operating points (engine clusters + verify pruning):\n\n| threshold | precision | recall | F1 | series recovered |\n|---|---|---|---|---|\n");
+    for th in [0.5, 0.6, 0.7, 0.8, 0.9, 0.95] {
+        let (_, p) = casefile_groups_at(ds, th);
+        let m = prf(&p, &truth.series);
+        md.push_str(&format!(
+            "| {th} | {} | {} | {} | {}/{} |\n",
+            pct(m.precision), pct(m.recall), pct(m.f1), m.series_recovered, m.series_total
+        ));
+    }
+    md.push('\n');
 
     // 2. Decoys.
     let mut decoy_rows = vec![];

@@ -1,0 +1,210 @@
+{
+  "decoys": [
+    {
+      "case_ids": [
+        "CC-26-001509",
+        "CC-26-001670",
+        "CC-26-001508"
+      ],
+      "failed_checks": [
+        "spatiotemporal_feasibility"
+      ],
+      "verdict": "fail",
+      "violates": "spatiotemporal_infeasible"
+    },
+    {
+      "case_ids": [
+        "CC-26-001353",
+        "CC-26-001387",
+        "CC-26-001409",
+        "CC-26-001442",
+        "CC-26-001354"
+      ],
+      "failed_checks": [
+        "spatiotemporal_feasibility"
+      ],
+      "verdict": "fail",
+      "violates": "spatiotemporal_infeasible"
+    },
+    {
+      "case_ids": [
+        "CC-25-000318",
+        "CC-25-000331",
+        "CC-26-000363",
+        "CC-26-000395",
+        "CC-25-000316"
+      ],
+      "failed_checks": [
+        "spatiotemporal_feasibility"
+      ],
+      "verdict": "fail",
+      "violates": "spatiotemporal_infeasible"
+    },
+    {
+      "case_ids": [
+        "CC-26-001654",
+        "CC-26-001731",
+        "CC-26-001650"
+      ],
+      "failed_checks": [
+        "spatiotemporal_feasibility"
+      ],
+      "verdict": "fail",
+      "violates": "spatiotemporal_infeasible"
+    },
+    {
+      "case_ids": [
+        "CC-25-000345",
+        "CC-26-000358",
+        "CC-26-000416",
+        "CC-26-000426",
+        "CC-25-000347"
+      ],
+      "failed_checks": [
+        "spatiotemporal_feasibility"
+      ],
+      "verdict": "fail",
+      "violates": "spatiotemporal_infeasible"
+    },
+    {
+      "case_ids": [
+        "CC-26-001184",
+        "CC-26-001202",
+        "CC-26-001228",
+        "CC-26-001248"
+      ],
+      "failed_checks": [
+        "conflicting_clearance"
+      ],
+      "verdict": "fail",
+      "violates": "conflicting_clearance"
+    },
+    {
+      "case_ids": [
+        "CC-26-001117",
+        "CC-26-001140",
+        "CC-26-001308",
+        "CC-26-001328",
+        "CC-26-001329"
+      ],
+      "failed_checks": [
+        "conflicting_clearance"
+      ],
+      "verdict": "fail",
+      "violates": "conflicting_clearance"
+    },
+    {
+      "case_ids": [
+        "CC-26-000487",
+        "CC-26-000663",
+        "CC-26-000692"
+      ],
+      "failed_checks": [
+        "conflicting_clearance"
+      ],
+      "verdict": "fail",
+      "violates": "conflicting_clearance"
+    },
+    {
+      "case_ids": [
+        "CC-25-000235",
+        "CC-25-000249",
+        "CC-25-000260",
+        "CC-25-000284"
+      ],
+      "failed_checks": [
+        "conflicting_clearance"
+      ],
+      "verdict": "fail",
+      "violates": "conflicting_clearance"
+    },
+    {
+      "case_ids": [
+        "CC-26-000686",
+        "CC-26-000758",
+        "CC-26-000821",
+        "CC-26-000823"
+      ],
+      "failed_checks": [
+        "conflicting_clearance"
+      ],
+      "verdict": "fail",
+      "violates": "conflicting_clearance"
+    }
+  ],
+  "decoys_rejected": 10,
+  "extraction_runs": 0,
+  "property": {
+    "conflicts_rejected": 83588,
+    "exact_correct": 100,
+    "exact_leads": 100,
+    "found": 113,
+    "marking_candidates": 2825,
+    "truth_resurfaced": 116
+  },
+  "series_pruned": {
+    "f1": 0.7891317188422918,
+    "precision": 0.6568338249754179,
+    "predicted_pairs": 1017,
+    "recall": 0.9881656804733728,
+    "series_recovered": 38,
+    "series_total": 40,
+    "true_pairs": 676
+  },
+  "series_raw": {
+    "f1": 0.7709174841315638,
+    "precision": 0.6319772942289499,
+    "predicted_pairs": 1057,
+    "recall": 0.9881656804733728,
+    "series_recovered": 38,
+    "series_total": 40,
+    "true_pairs": 676
+  },
+  "wall": [
+    {
+      "casefile": {
+        "f1": 0.8,
+        "precision": 0.6666666666666666,
+        "predicted_pairs": 6,
+        "recall": 1.0,
+        "series_recovered": 4,
+        "series_total": 4,
+        "true_pairs": 4
+      },
+      "cases": 20,
+      "llm_decoy_pairs_accepted": null,
+      "llm_only": null,
+      "subset": "n20"
+    },
+    {
+      "casefile": {
+        "f1": 0.6875,
+        "precision": 0.5789473684210527,
+        "predicted_pairs": 19,
+        "recall": 0.8461538461538461,
+        "series_recovered": 11,
+        "series_total": 13,
+        "true_pairs": 13
+      },
+      "cases": 60,
+      "llm_decoy_pairs_accepted": null,
+      "llm_only": null,
+      "subset": "n60"
+    },
+    {
+      "casefile": {
+        "f1": 0.8622754491017964,
+        "precision": 0.7741935483870968,
+        "predicted_pairs": 93,
+        "recall": 0.972972972972973,
+        "series_recovered": 22,
+        "series_total": 24,
+        "true_pairs": 74
+      },
+      "cases": 150,
+      "llm_decoy_pairs_accepted": null,
+      "llm_only": null,
+      "subset": "n150"
+    }
+  ]
+}

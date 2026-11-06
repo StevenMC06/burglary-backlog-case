@@ -1,36 +1,36 @@
 {
   "hero_decoy": {
     "case_ids": [
-      "CC-26-001510",
-      "CC-26-001669",
-      "CC-26-001511"
+      "CC-26-001509",
+      "CC-26-001670",
+      "CC-26-001508"
     ],
-    "offending_case": "CC-26-001511",
+    "offending_case": "CC-26-001508",
     "violates": "spatiotemporal_infeasible"
   },
   "hero_pawn": {
     "case_id": "CC-26-001996",
     "item_id": "CC-26-001996-I1",
     "note": "offense window ended ~5.5 days before the report; laptop pawned 3 days after the window",
-    "pawn_id": "PW-26-001494",
-    "trap_pawn_id": "PW-26-001490"
+    "pawn_id": "PW-26-001493",
+    "trap_pawn_id": "PW-26-001489"
   },
   "hero_series": {
     "arrestee_ref": "ARR-00001",
     "case_ids": [
-      "CC-26-001745",
-      "CC-26-001751",
-      "CC-26-001815",
-      "CC-26-001840",
+      "CC-26-001746",
+      "CC-26-001752",
+      "CC-26-001817",
+      "CC-26-001841",
       "CC-26-001856",
-      "CC-26-001928",
-      "CC-26-002000"
+      "CC-26-001930",
+      "CC-26-001999"
     ],
-    "cleared_case": "CC-26-001815",
-    "queue_case": "CC-26-002000"
+    "cleared_case": "CC-26-001817",
+    "queue_case": "CC-26-001999"
   },
   "hero_weak": {
-    "case_id": "CC-26-001990"
+    "case_id": "CC-26-001992"
   },
   "queue": [
     "CC-26-001965",

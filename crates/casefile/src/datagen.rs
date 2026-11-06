@@ -854,9 +854,15 @@ impl Gen {
     }
 
     /// A case with the same MO whose window overlaps `anchor` but sits >= 12 km away.
-    fn far_case(&mut self, anchor: &Case, mo: &Mo) -> Case {
-        let a = anchor.location;
-        let mut far: Vec<usize> = (0..self.pts.len()).filter(|&i| haversine_km(a, self.geo(i)) >= 12.5).collect();
+    /// Two cases with the same MO and the SAME 30-minute window (e.g. alarm-confirmed) at least
+    /// 15.5 km apart. One offender needs > 15.5/40 h + 10 min = 33 min, so even the best-case
+    /// timing is infeasible. Long windows would not work: within a 6-10 h window one offender
+    /// can legitimately do both jobs.
+    fn infeasible_pair(&mut self, anchor_ws_local: i64, mo: &Mo) -> (Case, Case) {
+        const MIN_KM: f64 = 15.5;
+        let ai = self.rng.below(self.pts.len());
+        let a = self.geo(ai);
+        let mut far: Vec<usize> = (0..self.pts.len()).filter(|&i| haversine_km(a, self.geo(i)) >= MIN_KM).collect();
         if far.is_empty() {
             let mut best = (0.0, 0usize);
             for i in 0..self.pts.len() {
@@ -867,12 +873,13 @@ impl Gen {
             }
             far.push(best.1);
         }
-        let pi = *self.rng.pick(&far);
-        let len = anchor.window_end - anchor.window_start;
-        let ws = anchor.window_start - TZ + self.rng.range(-20, 20) * 60;
-        let we = ws + len;
-        let reported = self.reported_for(we);
-        self.build_case(pi, mo, ws, we, reported, Opt::Normal)
+        let fi = *self.rng.pick(&far);
+        let (ws, we) = (anchor_ws_local, anchor_ws_local + 30 * 60);
+        let rep_a = self.reported_for(we);
+        let first = self.build_case(ai, mo, ws, we, rep_a, Opt::Normal);
+        let rep_b = self.reported_for(we);
+        let second = self.build_case(fi, mo, ws, we, rep_b, Opt::Normal);
+        (first, second)
     }
 
     // ---- pawn ---------------------------------------------------------------------------
@@ -1075,8 +1082,12 @@ pub fn generate(pts: &[Pt], seed: u64, n_cases: usize) -> anyhow::Result<Generat
         let spatial = d < N_DECOYS / 2;
         let (mut cs, mo) = g.plant(if spatial { size - 1 } else { size }, false);
         if spatial {
-            let far = cs.first().map(|a| g.far_case(a, &mo));
-            cs.extend(far);
+            let ws = cs.first().map_or(0, |a| a.window_start - TZ);
+            let (first, far) = g.infeasible_pair(ws, &mo);
+            if let Some(slot) = cs.first_mut() {
+                *slot = first;
+            }
+            cs.push(far);
         }
         let start = all.len();
         all.extend(cs);
@@ -1385,10 +1396,13 @@ mod tests {
             let cs: Vec<&Case> = d.case_ids.iter().map(|id| by_id(&g.ds, id)).collect();
             match d.violates.as_str() {
                 "spatiotemporal_infeasible" => {
+                    // Best-case (largest separation the windows allow) must still be too short.
                     let bad = cs.iter().enumerate().any(|(i, a)| {
                         cs[i + 1..].iter().any(|b| {
-                            let overlap = a.window_start < b.window_end && b.window_start < a.window_end;
-                            overlap && haversine_km(a.location, b.location) >= 12.0 && !feasible(a, b)
+                            let sep = (b.window_end - a.window_start).max(a.window_end - b.window_start) as f64 / 60.0;
+                            let need = haversine_km(a.location, b.location) / MAX_URBAN_SPEED_KMH * 60.0
+                                + MIN_ON_SCENE_MIN;
+                            haversine_km(a.location, b.location) >= 12.0 && sep < need
                         })
                     });
                     assert!(bad, "{:?}", d.case_ids);
@@ -1463,7 +1477,10 @@ mod tests {
             .filter(|c| c.mo.as_ref().is_some_and(|m| m.premise == Premise::Residential && m.time_band == TimeBand::Midday))
             .collect();
         assert!(!res_mid.is_empty());
-        assert!(res_mid.iter().all(|c| c.facts.window_hours >= 5.9 && c.facts.window_hours <= 10.1));
+        // Spatiotemporal decoys deliberately have a confirmed 30-minute window.
+        assert!(res_mid
+            .iter()
+            .all(|c| (c.facts.window_hours >= 5.9 && c.facts.window_hours <= 10.1) || c.facts.window_hours == 0.5));
         assert!(g.ds.cases.iter().any(|c| c.narrative.contains("UNK SUSP") || c.narrative.contains("POE")));
     }
 

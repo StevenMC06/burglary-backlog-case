@@ -37,7 +37,7 @@ use crate::store::Store;
 /// Minutes before an unanswered approval ticket escalates to the next approver.
 pub const ESCALATE_AFTER_MINUTES: u32 = 120;
 /// Cluster threshold used when the caller gives none (also for the solvability context).
-pub const DEFAULT_CLUSTER_THRESHOLD: f64 = 0.7;
+pub const DEFAULT_CLUSTER_THRESHOLD: f64 = 0.9;
 const MAX_SEARCH_LIMIT: usize = 50;
 const MAX_SIMILAR_K: usize = 10;
 const MAX_CLUSTERS_RETURNED: usize = 60;
@@ -163,7 +163,7 @@ pub struct SimilarCasesParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ProposeClustersParams {
-    /// Edge threshold on the 0..1 pair score (default 0.7). Higher is stricter and returns fewer,
+    /// Edge threshold on the 0..1 pair score (default 0.9). Higher is stricter and returns fewer,
     /// tighter groups.
     pub threshold: Option<f64>,
 }
