@@ -491,3 +491,26 @@ async fn json_rpc_round_trip_over_pipe() {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), task).await;
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[tokio::test]
+async fn corrupt_audit_cannot_authorize_or_create_ticket() {
+    let root = temp_root();
+    let s = server_in(&root);
+    s.request_approval(Parameters(RequestApprovalParams {
+        kind: "assignment".into(), subject: "CC-25-000002".into(),
+        summary: "assign".into(), payload: None,
+    })).await.unwrap();
+    AuditLog::open(&root).append("sgt.demo", "approve", "AP-0001", json!({})).unwrap();
+    let audit = root.join("data/audit.jsonl");
+    let changed = std::fs::read_to_string(&audit).unwrap().replace("sgt.demo", "forged.actor");
+    std::fs::write(&audit, changed).unwrap();
+    assert!(s.approval_status(Parameters(ApprovalStatusParams {ticket_id: "AP-0001".into()})).await.is_err());
+    let path = root.join("data/approvals.json");
+    let before = std::fs::read(&path).unwrap();
+    assert!(s.request_approval(Parameters(RequestApprovalParams {
+        kind: "assignment".into(), subject: "CC-25-000002".into(),
+        summary: "assign again".into(), payload: None,
+    })).await.is_err());
+    assert_eq!(std::fs::read(path).unwrap(), before);
+    let _ = std::fs::remove_dir_all(root);
+}

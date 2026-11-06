@@ -450,7 +450,10 @@ pub fn build_team(root: &Path) -> Value {
 }
 
 pub fn build_audit(log: &AuditLog) -> Value {
-    let entries = log.entries();
+    let entries = match log.try_entries() {
+        Ok(entries) => entries,
+        Err(e) => return json!({"entries": [], "chain": {"intact": false, "error": e.to_string()}}),
+    };
     let chain = match log.verify() {
         Ok(n) => json!({"intact": true, "entries": n}),
         Err(seq) => json!({"intact": false, "entries": entries.len(), "first_bad_seq": seq}),
@@ -465,6 +468,40 @@ pub struct DecisionIn {
     subject: String,
     #[serde(default)]
     detail: Value,
+}
+
+/// Validate against server-owned records, never the caller's supplied verdict.
+fn validate_decision(app: &App, d: &mut DecisionIn) -> Result<(), String> {
+    match d.action.as_str() {
+        "approve_series_alert" => {
+            let all = build_series(app);
+            let series = all["series"].as_array().and_then(|rows| rows.iter().find(|s| s["id"] == d.subject))
+                .ok_or_else(|| "unknown series subject".to_string())?;
+            if series["verify"]["verdict"] == "fail" {
+                return Err("cannot approve a failed series".into());
+            }
+            // Audit the facts actually approved, not caller-supplied membership/verdict.
+            if !d.detail.is_object() { d.detail = json!({}); }
+            d.detail["case_ids"] = series["case_ids"].clone();
+            d.detail["verdict"] = series["verify"]["verdict"].clone();
+        }
+        "accept_step" | "reject_step" | "approve_victim_update" => {
+            if find_case(&app.store.ds, &d.subject).is_none() {
+                return Err("unknown case subject".into());
+            }
+            if d.action == "reject_step" {
+                let reason = d.detail["reason"].as_str().unwrap_or("");
+                if !["Not lawful", "Not available", "Too resource-intensive", "Other"].contains(&reason) {
+                    return Err("recognized rejection reason required".into());
+                }
+                if reason == "Other" && d.detail["note"].as_str().unwrap_or("").trim().is_empty() {
+                    return Err("explanation required for Other".into());
+                }
+            }
+        }
+        _ => return Err("unknown decision action".into()),
+    }
+    Ok(())
 }
 
 pub fn record_decision(log: &AuditLog, d: DecisionIn) -> Result<Value, String> {
@@ -518,8 +555,9 @@ async fn h_replay(
     Ok(Json(replay_timeline(&run, q.speed.unwrap_or(1.0))))
 }
 
-async fn h_decision(State(a): Shared, Json(d): Json<DecisionIn>) -> ApiResult {
+async fn h_decision(State(a): Shared, Json(mut d): Json<DecisionIn>) -> ApiResult {
     let _g = a.audit_lock.lock().unwrap_or_else(|e| e.into_inner());
+    validate_decision(&a, &mut d).map_err(|m| err(StatusCode::BAD_REQUEST, m))?;
     record_decision(&a.audit, d).map(Json).map_err(|m| err(StatusCode::BAD_REQUEST, m))
 }
 
@@ -613,6 +651,50 @@ mod tests {
             let tmp = std::env::temp_dir().join(format!("casefile-server-{}", std::process::id()));
             App::build(&root, store, AuditLog::open(&tmp))
         })
+    }
+
+    #[tokio::test]
+    async fn backend_decisions_reject_bypass_without_append() {
+        let root = repo_root();
+        let dir = std::env::temp_dir().join(format!("casefile-gate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let a = Arc::new(App::build(&root, Store::load(&root).unwrap(), AuditLog::open(&dir)));
+        let case_id = a.queue[0].clone();
+        let decision = |action: &str, subject: &str, detail: Value| DecisionIn {
+            actor: "det.demo".into(), action: action.into(), subject: subject.into(), detail,
+        };
+        for d in [
+            decision("approve_series_alert", "H-DECOY", json!({"verdict":"pass", "case_ids":[]})),
+            decision("approve_series_alert", "NO-SERIES", json!({})),
+            decision("accept_step", "NO-CASE", json!({})),
+            decision("made_up", &case_id, json!({})),
+            decision("reject_step", &case_id, json!({})),
+            decision("reject_step", &case_id, json!({"reason":"invalid"})),
+            decision("reject_step", &case_id, json!({"reason":"Other", "note":"  "})),
+        ] {
+            let failure = h_decision(State(a.clone()), Json(d)).await.unwrap_err();
+            assert_eq!(failure.0, StatusCode::BAD_REQUEST);
+            assert_eq!(a.audit.verify(), Ok(0));
+        }
+        for (index, d) in [
+            decision("accept_step", &case_id, json!({})),
+            decision("reject_step", &case_id, json!({"reason":"Not lawful"})),
+            decision("reject_step", &case_id, json!({"reason":"Other", "note":"source unavailable"})),
+            decision("approve_victim_update", &case_id, json!({})),
+        ].into_iter().enumerate() {
+            assert!(h_decision(State(a.clone()), Json(d)).await.is_ok());
+            assert_eq!(a.audit.verify(), Ok(index + 1));
+        }
+        let series = build_series(&a);
+        let valid = series["series"].as_array().unwrap().iter().find(|row| row["verify"]["verdict"] != "fail").unwrap();
+        let before = a.audit.verify().unwrap();
+        assert!(h_decision(State(a.clone()), Json(decision("approve_series_alert", valid["id"].as_str().unwrap(), json!({"verdict":"fail"})))).await.is_ok());
+        assert_eq!(a.audit.verify(), Ok(before + 1));
+        let entries = a.audit.try_entries().unwrap();
+        let last = entries.last().unwrap();
+        assert_eq!(last.detail["case_ids"], valid["case_ids"]);
+        assert_eq!(last.detail["verdict"], valid["verify"]["verdict"]);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

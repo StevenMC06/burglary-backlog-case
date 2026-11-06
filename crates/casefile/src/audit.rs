@@ -49,12 +49,33 @@ impl AuditLog {
         self
     }
 
+    /// Missing logs are new logs; all other read/parse failures are errors.
+    pub fn try_entries(&self) -> anyhow::Result<Vec<Entry>> {
+        let text = match std::fs::read_to_string(&self.path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+            Err(e) => return Err(e.into()),
+        };
+        text.lines().enumerate().map(|(i, line)| {
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("invalid audit line {}: {e}", i + 1))
+        }).collect()
+    }
+
+    #[cfg(test)]
     pub fn entries(&self) -> Vec<Entry> {
-        std::fs::read_to_string(&self.path)
-            .unwrap_or_default()
-            .lines()
-            .filter_map(|l| serde_json::from_str(l).ok())
-            .collect()
+        self.try_entries().unwrap_or_default()
+    }
+
+    pub fn ensure_appendable(&self) -> anyhow::Result<()> {
+        self.verify().map_err(|seq| anyhow::anyhow!("audit integrity failure at sequence {seq}"))?;
+        let all = self.try_entries()?;
+        if !all.is_empty() && !std::fs::read(&self.path)?.ends_with(b"\n") {
+            anyhow::bail!("audit final entry is missing its newline; refusing append");
+        }
+        if self.cap.is_some_and(|cap| all.len() >= cap) {
+            anyhow::bail!("demo audit log is full");
+        }
+        Ok(())
     }
 
     pub fn append(
@@ -64,10 +85,8 @@ impl AuditLog {
         subject: &str,
         detail: serde_json::Value,
     ) -> anyhow::Result<Entry> {
-        let all = self.entries();
-        if self.cap.is_some_and(|c| all.len() >= c) {
-            anyhow::bail!("the demo audit log is full ({} entries); restart the demo to reset it", all.len());
-        }
+        self.ensure_appendable()?;
+        let all = self.try_entries()?;
         let (seq, prev) =
             all.last().map(|e| (e.seq + 1, e.hash.clone())).unwrap_or((0, "genesis".into()));
         let ts = std::time::SystemTime::now()
@@ -97,9 +116,9 @@ impl AuditLog {
     /// Ok(n) = chain of n entries intact; Err(seq) = first broken entry.
     pub fn verify(&self) -> Result<usize, u64> {
         let mut prev = "genesis".to_string();
-        let all = self.entries();
-        for e in &all {
-            if e.prev != prev || digest(e) != e.hash {
+        let all = self.try_entries().map_err(|_| 0_u64)?;
+        for (index, e) in all.iter().enumerate() {
+            if e.seq != index as u64 || e.prev != prev || digest(e) != e.hash {
                 return Err(e.seq);
             }
             prev = e.hash.clone();
@@ -111,6 +130,37 @@ impl AuditLog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn corruption_and_read_errors_fail_closed() {
+        let dir = std::env::temp_dir().join(format!("casefile-corrupt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let log = AuditLog::open(&dir);
+        log.append("det.demo", "accept_step", "CC-1", serde_json::json!({})).unwrap();
+        let original = std::fs::read_to_string(&log.path).unwrap();
+        for broken in [format!("{original}garbage\n"), format!("garbage\n{original}")] {
+            std::fs::write(&log.path, &broken).unwrap();
+            assert!(log.try_entries().is_err());
+            assert!(log.verify().is_err());
+            assert!(log.append("det.demo", "accept_step", "CC-1", serde_json::json!({})).is_err());
+            assert_eq!(std::fs::read_to_string(&log.path).unwrap(), broken);
+        }
+        std::fs::write(&log.path, original.trim_end()).unwrap();
+        let before = std::fs::read(&log.path).unwrap();
+        assert!(log.append("demo", "x", "y", serde_json::json!({})).is_err());
+        assert_eq!(std::fs::read(&log.path).unwrap(), before);
+        let mut entry: Entry = serde_json::from_str(original.trim()).unwrap();
+        entry.seq = 9;
+        entry.hash = digest(&entry);
+        std::fs::write(&log.path, serde_json::to_string(&entry).unwrap()).unwrap();
+        assert!(log.verify().is_err(), "even rehashed entries need contiguous sequences");
+        std::fs::remove_file(&log.path).unwrap();
+        std::fs::create_dir(&log.path).unwrap();
+        assert!(log.try_entries().is_err());
+        assert!(log.verify().is_err());
+        assert!(log.append("demo", "x", "y", serde_json::json!({})).is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn chain_detects_tampering() {

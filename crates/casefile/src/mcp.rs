@@ -440,6 +440,8 @@ impl CasefileServer {
         payload: Value,
     ) -> Result<Approval, String> {
         let _g = self.lock_files();
+        AuditLog::open(&self.inner.root).ensure_appendable()
+            .map_err(|e| format!("audit unavailable: {e}"))?;
         let path = self.approvals_path();
         let mut rows: Vec<Approval> = read_json_list(&path)?;
         let next = rows
@@ -703,8 +705,11 @@ impl CasefileServer {
             .ok_or_else(|| format!("unknown ticket_id '{id}'"))?;
         // A decision may have been recorded through the audit log (web console) rather than the file.
         if t.status == "pending" {
+            AuditLog::open(&self.inner.root).verify()
+                .map_err(|seq| format!("audit integrity failure at sequence {seq}"))?;
             let decision = AuditLog::open(&self.inner.root)
-                .entries()
+                .try_entries()
+                .map_err(|e| format!("audit read failed: {e}"))?
                 .into_iter()
                 .filter(|e| e.subject == t.ticket_id)
                 .rfind(|e| {
