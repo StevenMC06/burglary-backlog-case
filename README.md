@@ -1,12 +1,17 @@
 # Cracking the Burglary Backlog — Team 6
 
-Working space for research, financial assumptions, and a synthetic-data prototype. The final deliverable is a presentation; use Google Slides for collaborative slide editing and put its link below.
+
+
+https://github.com/user-attachments/assets/1a14b370-0ada-4982-815d-c2d8cef812e9
+
+
 
 ## Logistics
 - Deck: Friday, November 6, 2026, 1:00 PM Pacific, per Daniel's email. PDF or Google Slides link; under 10 slides.
 - Pitch: 3:03 PM, DEM 004; arrive by 2:53 PM. Seven-minute presentation including demo, three-minute Q&A.
 - Team: Shaurya Agarwal, Steven Carmona, Kevin Pham, Gowrav Shivakumara, Sonny Choi.
-- Slides link: TBD
+
+
 
 ## Start here
 1. Read [the brief](brief.md) and [workshop notes](research/workshop-notes.md).
